@@ -8,12 +8,19 @@
     "scheme": "ecosnap",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/images/leaf-icon.png"
+      "icon": "./assets/images/leaf-icon.png",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "EcoSnap uses your current GPS location to center the live impact map and show nearby hotspots."
+      }
     },
     "android": {
       "icon": "./assets/images/leaf-icon.png",
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.ecosnap"
+      "package": "com.anonymous.ecosnap",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "output": "static",
@@ -32,7 +39,13 @@
         }
       ],
       "expo-font",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "EcoSnap uses your current GPS location to center the live impact map and show nearby hotspots."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
