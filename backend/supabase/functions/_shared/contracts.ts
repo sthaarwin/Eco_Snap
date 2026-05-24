@@ -32,6 +32,8 @@ export interface SubmissionResponse {
   ai_reasoning?: string;
   reward_awarded?: number;
   created_at: string;
+  auto_approved?: boolean;
+  reward_awarded?: number;
 }
 
 export interface VerificationResult {

@@ -1,0 +1,42 @@
+{
+  "version": "5",
+  "remote": {
+    "https://deno.land/std@0.210.0/async/delay.ts": "d414b6ff5b597a3b8a90b1b860b675062a106ad0e311816256f4696aa40ec1a1",
+    "https://deno.land/std@0.210.0/http/server.ts": "59a47779624ff748a058c6959d75fc5ca9f334d32b327344a2eec20561880b58",
+    "https://esm.sh/@supabase/supabase-js@2.39.0": "f51aeb2dbf8f67c8fa396628af45793e3513067d45705f1ea158f5c678bb0cea"
+  },
+  "workspace": {
+    "packageJson": {
+      "dependencies": [
+        "npm:@expo/vector-icons@^15.0.3",
+        "npm:@supabase/supabase-js@^2.106.1",
+        "npm:@types/react@~19.1.10",
+        "npm:expo-camera@~17.0.10",
+        "npm:expo-constants@~18.0.13",
+        "npm:expo-device@~8.0.10",
+        "npm:expo-font@~14.0.11",
+        "npm:expo-linking@~8.0.12",
+        "npm:expo-location@~19.0.8",
+        "npm:expo-navigation-bar@~5.0.10",
+        "npm:expo-router@~6.0.23",
+        "npm:expo-secure-store@~15.0.8",
+        "npm:expo-splash-screen@~31.0.13",
+        "npm:expo-status-bar@~3.0.9",
+        "npm:expo-system-ui@~6.0.9",
+        "npm:expo-web-browser@~15.0.11",
+        "npm:expo@54.0",
+        "npm:react-dom@19.1.0",
+        "npm:react-native-gesture-handler@2.28",
+        "npm:react-native-maps@1.20.1",
+        "npm:react-native-reanimated@~4.1.1",
+        "npm:react-native-safe-area-context@5.6",
+        "npm:react-native-screens@4.16",
+        "npm:react-native-web@0.21",
+        "npm:react-native-worklets@0.5.1",
+        "npm:react-native@0.81.5",
+        "npm:react@19.1.0",
+        "npm:typescript@~5.9.2"
+      ]
+    }
+  }
+}

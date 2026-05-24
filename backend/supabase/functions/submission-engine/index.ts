@@ -55,39 +55,55 @@ serve(async (req) => {
 
       if (dbError) throw dbError
 
-      // Run AI verification before responding so the app can show approved, rejected, or council review immediately.
+      // Trigger AI verification and wait for result so client can show final status immediately.
       const aiEngineUrl = `${Deno.env.get('SUPABASE_URL')!}/functions/v1/ai-engine/verify-image`
-      let aiResult: {
-        confidence_score?: number
-        verification_status?: SubmissionResponse['verification_status']
-        ai_reasoning?: string
-        reward_awarded?: number
-      } | null = null
+      const aiResponse = await fetch(aiEngineUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ submission_id: submission.id }),
+      }).catch((err) => {
+        console.error('ai-engine trigger failed:', err)
+        return null
+      })
 
-      try {
-        const aiResponse = await fetch(aiEngineUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ submission_id: submission.id }),
-        })
+      let auto_approved = false
+      let reward_awarded = 0
+      let ai_reasoning: string | undefined
+      let confidence_score: number | undefined
 
-        if (aiResponse.ok) {
-          aiResult = await aiResponse.json()
-        } else {
-          console.error('ai-engine verification failed:', aiResponse.status, await aiResponse.text())
+      if (aiResponse?.ok) {
+        const aiResult = await aiResponse.json() as {
+          auto_approved?: boolean
+          reward_awarded?: number
+          verdict?: SubmissionResponse['verification_status']
+          ai_reasoning?: string
+          confidence_score?: number
         }
-      } catch (err) {
-        console.error('ai-engine verification failed:', err)
+
+        auto_approved = Boolean(aiResult.auto_approved)
+        reward_awarded = aiResult.reward_awarded ?? 0
+        ai_reasoning = aiResult.ai_reasoning
+        confidence_score = aiResult.confidence_score
+      } else if (aiResponse) {
+        console.error('ai-engine verification failed:', aiResponse.status, await aiResponse.text())
       }
+
+      // Re-fetch the finalized submission so we return the DB-persisted verification_status
+      const { data: finalizedSubmission } = await supabase
+        .from('mission_submissions')
+        .select('*')
+        .eq('id', submission.id)
+        .single()
 
       return new Response(
         JSON.stringify({
-          ...submission,
-          confidence_score: aiResult?.confidence_score ?? submission.confidence_score,
-          verification_status: aiResult?.verification_status ?? submission.verification_status,
-          ai_reasoning: aiResult?.ai_reasoning,
-          reward_awarded: aiResult?.reward_awarded ?? 0,
-        } as SubmissionResponse & { ai_reasoning?: string; reward_awarded: number }),
+          ...(finalizedSubmission ?? submission),
+          confidence_score: confidence_score ?? finalizedSubmission?.confidence_score,
+          verification_status: finalizedSubmission?.verification_status ?? submission.verification_status,
+          ai_reasoning,
+          auto_approved,
+          reward_awarded,
+        } satisfies SubmissionResponse & { auto_approved: boolean; reward_awarded: number; ai_reasoning?: string }),
         { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -171,8 +187,9 @@ serve(async (req) => {
     )
   } catch (err) {
     console.error('submission-engine error:', err)
+    const details = err instanceof Error ? err.message : String(err)
     return new Response(
-      JSON.stringify({ error: 'Internal server error', code: 'INTERNAL_ERROR', details: err.message } satisfies ApiError),
+      JSON.stringify({ error: 'Internal server error', code: 'INTERNAL_ERROR', details } satisfies ApiError),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
