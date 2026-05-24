@@ -84,10 +84,10 @@ export default function CouncilPageScreen() {
 
               <View style={styles.actionRow}>
                 <Pressable style={styles.secondaryButton} onPress={() => complete(item.id)}>
-                  <Text style={styles.secondaryText}>Needs Review</Text>
+                  <Text style={styles.secondaryText}>Dislike</Text>
                 </Pressable>
                 <Pressable style={styles.primaryButton} onPress={() => complete(item.id)}>
-                  <Text style={styles.primaryText}>Approve</Text>
+                  <Text style={styles.primaryText}>Like</Text>
                 </Pressable>
               </View>
             </View>
