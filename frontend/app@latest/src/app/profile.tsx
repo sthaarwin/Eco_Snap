@@ -1,4 +1,5 @@
-import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 
 import { EcoColors, EcoRadius, EcoSpacing } from '@/constants/ecosnap-theme';
 
@@ -24,6 +25,8 @@ const timeline = [
 ];
 
 export default function ProfileScreen() {
+  const router = useRouter();
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container}>
@@ -78,6 +81,13 @@ export default function ProfileScreen() {
             <Text style={styles.timelineChip}>{item.points}</Text>
           </View>
         ))}
+
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.replace('/signup')}
+          style={({ pressed }) => [styles.logoutButton, pressed && styles.logoutPressed]}>
+          <Text style={styles.logoutText}>Log out</Text>
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
@@ -250,5 +260,22 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 11,
     overflow: 'hidden',
+  },
+  logoutButton: {
+    marginTop: EcoSpacing.sm,
+    borderRadius: EcoRadius.lg,
+    backgroundColor: '#e34d4d',
+    paddingVertical: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoutPressed: {
+    opacity: 0.86,
+  },
+  logoutText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 0.3,
   },
 });
