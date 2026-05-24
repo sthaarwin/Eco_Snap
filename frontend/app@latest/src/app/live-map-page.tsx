@@ -7,13 +7,14 @@ import { EcoColors, EcoRadius, EcoSpacing } from '@/constants/ecosnap-theme';
 import { supabase } from '@/lib/supabase';
 import { MapView, Marker, Polyline } from '@/components/map-view';
 
-type Hotspot = {
+type Mission = {
   id: string;
+  title: string;
+  narrative: string;
   coordinates: { lat: number; lng: number };
-  status: 'active' | 'resolved';
-  severity: number;
-  category: string;
-  mission_id: string | null;
+  priority: number;
+  status: 'active' | 'resolved' | 'pending';
+  location_name: string | null;
   created_at: string;
 };
 
@@ -34,37 +35,37 @@ export default function LiveMapPageScreen() {
   const params = useLocalSearchParams<{ tracking?: string, missionId?: string }>();
   const isTracking = params.tracking === 'true';
 
-  const [hotspots, setHotspots] = useState<Hotspot[]>([]);
+  const [missions, setMissions] = useState<Mission[]>([]);
   const [currentLocation, setCurrentLocation] = useState<CurrentLocation | null>(null);
   const [mapRegion, setMapRegion] = useState(DEFAULT_REGION);
   const [locationStatus, setLocationStatus] = useState('Finding your GPS location...');
   const [pathCoordinates, setPathCoordinates] = useState<{ latitude: number; longitude: number }[]>([]);
 
   useEffect(() => {
-    const fetchHotspots = async () => {
+    const fetchMissions = async () => {
       const { data, error } = await supabase
-        .from('hotspots')
+        .from('missions')
         .select('*')
-        .order('severity', { ascending: false });
+        .order('priority', { ascending: false });
 
       if (!error && data) {
-        setHotspots(data as unknown as Hotspot[]);
+        setMissions(data as unknown as Mission[]);
       }
     };
 
-    fetchHotspots();
+    fetchMissions();
 
     const channel = supabase
-      .channel('hotspots')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'hotspots' }, (payload) => {
+      .channel('missions')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'missions' }, (payload) => {
         if (payload.eventType === 'INSERT') {
-          setHotspots((prev) => [payload.new as Hotspot, ...prev]);
+          setMissions((prev) => [payload.new as Mission, ...prev]);
         } else if (payload.eventType === 'UPDATE') {
-          setHotspots((prev) =>
-            prev.map((h) => (h.id === (payload.new as Hotspot).id ? (payload.new as Hotspot) : h)),
+          setMissions((prev) =>
+            prev.map((h) => (h.id === (payload.new as Mission).id ? (payload.new as Mission) : h)),
           );
         } else if (payload.eventType === 'DELETE') {
-          setHotspots((prev) => prev.filter((h) => h.id !== (payload.old as Hotspot).id));
+          setMissions((prev) => prev.filter((h) => h.id !== (payload.old as Mission).id));
         }
       })
       .subscribe();
@@ -152,13 +153,13 @@ export default function LiveMapPageScreen() {
     };
   }, [isTracking]);
 
-  const severityColor = (severity: number) => {
-    if (severity >= 4) return '#ef4444';
-    if (severity >= 2) return '#f59e0b';
+  const priorityColor = (priority: number) => {
+    if (priority >= 4) return '#ef4444';
+    if (priority >= 2) return '#f59e0b';
     return '#22c55e';
   };
 
-  const activeHotspots = hotspots.filter((h) => h.status === 'active');
+  const activeMissions = missions.filter((h) => h.status === 'active');
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -176,7 +177,7 @@ export default function LiveMapPageScreen() {
               ))}
             </View>
 
-            {activeHotspots.map((spot) => (
+            {activeMissions.map((spot) => (
               <View
                 key={spot.id}
                 style={[
@@ -184,7 +185,7 @@ export default function LiveMapPageScreen() {
                   {
                     left: `${((spot.coordinates.lng + 180) / 360) * 80 + 10}%` as any,
                     top: `${((90 - spot.coordinates.lat) / 180) * 80 + 10}%` as any,
-                    backgroundColor: severityColor(spot.severity),
+                    backgroundColor: priorityColor(spot.priority),
                   },
                 ]}
               />
@@ -203,7 +204,7 @@ export default function LiveMapPageScreen() {
             ) : null}
 
             <Text style={styles.mapLabel}>
-              {activeHotspots.length} hotspot{activeHotspots.length !== 1 ? 's' : ''} active
+              {activeMissions.length} mission{activeMissions.length !== 1 ? 's' : ''} active
             </Text>
           </View>
         ) : (
@@ -231,16 +232,16 @@ export default function LiveMapPageScreen() {
                 />
               ) : null}
 
-              {activeHotspots.map((spot) => (
+              {activeMissions.map((spot) => (
                 <Marker
                   key={spot.id}
                   coordinate={{
                     latitude: spot.coordinates.lat,
                     longitude: spot.coordinates.lng,
                   }}
-                  pinColor={severityColor(spot.severity)}
-                  title={`Severity ${spot.severity}`}
-                  description={(spot.category || 'Unknown Category').replace(/_/g, ' ')}
+                  pinColor={priorityColor(spot.priority)}
+                  title={`Priority ${spot.priority}`}
+                  description={spot.location_name || spot.title}
                 />
               ))}
             </MapView>
@@ -274,12 +275,12 @@ export default function LiveMapPageScreen() {
 
         <View style={styles.feedCard}>
           <Text style={styles.feedTitle}>Live Feed</Text>
-          {activeHotspots.length === 0 ? (
-            <Text style={styles.feedItem}>No active hotspots. All clear.</Text>
+          {activeMissions.length === 0 ? (
+            <Text style={styles.feedItem}>No active missions. All clear.</Text>
           ) : (
-            activeHotspots.slice(0, 5).map((spot) => (
+            activeMissions.slice(0, 5).map((spot) => (
               <Text key={spot.id} style={styles.feedItem}>
-                {(spot.category || 'Unknown Category').replace(/_/g, ' ')} detected (severity {spot.severity}).
+                {spot.title || spot.location_name || 'Mission'} active (priority {spot.priority}).
               </Text>
             ))
           )}

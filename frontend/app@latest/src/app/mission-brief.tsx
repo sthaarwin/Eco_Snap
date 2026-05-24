@@ -6,13 +6,14 @@ import * as Location from 'expo-location';
 import { EcoColors, EcoRadius, EcoSpacing } from '@/constants/ecosnap-theme';
 import { supabase } from '@/lib/supabase';
 
-type Hotspot = {
+type Mission = {
   id: string;
+  title: string;
+  narrative: string;
   coordinates: { lat: number; lng: number };
-  status: 'active' | 'resolved';
-  severity: number;
-  category: string;
-  mission_id: string | null;
+  priority: number;
+  status: 'active' | 'resolved' | 'pending';
+  location_name: string | null;
   created_at: string;
 };
 
@@ -35,7 +36,7 @@ const { width } = Dimensions.get('window');
 
 export default function MissionBriefScreen() {
   const router = useRouter();
-  const [missions, setMissions] = useState<(Hotspot & { distance?: number })[]>([]);
+  const [missions, setMissions] = useState<(Mission & { distance?: number })[]>([]);
   const [loading, setLoading] = useState(true);
   const [locationName, setLocationName] = useState('your area');
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -67,19 +68,19 @@ export default function MissionBriefScreen() {
           }
         }
 
-        // Fetch active hotspots from supabase
+        // Fetch active missions from supabase
         const { data, error } = await supabase
-          .from('hotspots')
+          .from('missions')
           .select('*')
           .eq('status', 'active');
 
         if (!error && data) {
-          const hotspotsWithDistance = (data as Hotspot[]).map(h => ({
-            ...h,
-            distance: getDistanceFromLatLonInKm(userLat, userLng, h.coordinates.lat, h.coordinates.lng)
+          const missionsWithDistance = (data as Mission[]).map(m => ({
+            ...m,
+            distance: getDistanceFromLatLonInKm(userLat, userLng, m.coordinates.lat, m.coordinates.lng)
           })).sort((a, b) => (a.distance || 0) - (b.distance || 0));
 
-          setMissions(hotspotsWithDistance);
+          setMissions(missionsWithDistance);
         }
       } catch (err) {
         console.error(err);
@@ -134,13 +135,13 @@ export default function MissionBriefScreen() {
                   <View style={styles.card}>
                     <View style={styles.badgeRow}>
                       <Text style={[styles.badge, styles.activeBadge]}>ACTIVE MISSION</Text>
-                      <Text style={[styles.badge, styles.priorityBadge, mission.severity >= 4 && styles.urgentBadge]}>
-                        PRIORITY {mission.severity}
+                      <Text style={[styles.badge, styles.priorityBadge, mission.priority >= 4 && styles.urgentBadge]}>
+                        PRIORITY {mission.priority}
                       </Text>
                     </View>
 
                     <Text style={styles.missionCardTitle}>
-                      {mission.category ? mission.category.replace(/_/g, ' ').toUpperCase() : `Mission #${index + 1}`}
+                      {mission.title || `Mission #${index + 1}`}
                     </Text>
 
                     <View style={styles.heroCard}>
@@ -152,24 +153,23 @@ export default function MissionBriefScreen() {
                       />
                       <View style={styles.overlayLabel}>
                         <Text style={styles.overlayLabelText}>
-                          {mission.distance !== undefined ? `${mission.distance.toFixed(1)} km away` : 'Nearby'}
+                          {mission.location_name || (mission.distance !== undefined ? `${mission.distance.toFixed(1)} km away` : 'Nearby')}
                         </Text>
                       </View>
                     </View>
 
                     <Text style={styles.sectionTitle}>Intelligence Report</Text>
                     <Text style={styles.body}>
-                      Sensor networks and scout reports indicate a severity {mission.severity} issue at this location.
-                      Objective: document pollutant categories, mitigate the issue if possible, and submit a verified report to earn rewards.
+                      {mission.narrative || 'Detailed narrative not provided for this mission. Please proceed to the location.'}
                     </Text>
 
                     <View style={styles.metricsRow}>
                       <View style={styles.metricBox}>
-                        <Text style={styles.metricValue}>{Math.round(mission.severity * 100 + 50)}</Text>
+                        <Text style={styles.metricValue}>{Math.round(mission.priority * 100 + 50)}</Text>
                         <Text style={styles.metricLabel}>XP</Text>
                       </View>
                       <View style={styles.metricBox}>
-                        <Text style={[styles.metricValue, { color: EcoColors.sky }]}>{mission.severity * 5}</Text>
+                        <Text style={[styles.metricValue, { color: EcoColors.sky }]}>{mission.priority * 5}</Text>
                         <Text style={styles.metricLabel}>Impact</Text>
                       </View>
                     </View>
