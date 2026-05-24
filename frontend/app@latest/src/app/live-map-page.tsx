@@ -1,8 +1,14 @@
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import type { DimensionValue } from 'react-native';
 
 import { EcoColors, EcoRadius, EcoSpacing } from '@/constants/ecosnap-theme';
 
-const hotspots = [
+const hotspots: Array<{
+  id: string;
+  severity: 'high' | 'medium' | 'low';
+  x: DimensionValue;
+  y: DimensionValue;
+}> = [
   { id: 'H-14', severity: 'high', x: '72%', y: '30%' },
   { id: 'H-09', severity: 'medium', x: '36%', y: '48%' },
   { id: 'H-03', severity: 'low', x: '52%', y: '70%' },

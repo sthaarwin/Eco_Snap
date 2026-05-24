@@ -42,7 +42,9 @@ export default function SignupScreen() {
         router.replace('/');
       }
     } catch (error: any) {
-      Alert.alert('Sign Up Error', error.message || 'An unexpected error occurred');
+      console.error('Sign Up Error Detail:', error);
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+      Alert.alert('Sign Up Error', errorMessage);
     } finally {
       setIsLoading(false);
     }

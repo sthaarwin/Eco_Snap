@@ -41,7 +41,9 @@ export default function LoginScreen() {
 
       router.replace('/live-map-page');
     } catch (error: any) {
-      Alert.alert('Login Error', error.message || 'An unexpected error occurred');
+      console.error('Login Error Detail:', error);
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+      Alert.alert('Login Error', errorMessage);
     } finally {
       setIsLoading(false);
     }

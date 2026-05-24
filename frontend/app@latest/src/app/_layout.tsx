@@ -16,7 +16,8 @@ function RootLayoutNav() {
   useEffect(() => {
     if (isLoading) return;
 
-    const inAuthGroup = segments[0] === 'index' || segments[0] === 'signup';
+    const path = segments.join('/');
+    const inAuthGroup = path === '' || path === 'signup';
 
     if (!user && !inAuthGroup) {
       router.replace('/');
@@ -25,7 +26,8 @@ function RootLayoutNav() {
     }
   }, [user, isLoading, segments]);
 
-  const isAuthRoute = segments[0] === 'index' || segments[0] === 'signup';
+  const path = segments.join('/');
+  const isAuthRoute = path === '' || path === 'signup';
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
