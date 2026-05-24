@@ -1,28 +1,23 @@
 {
   "expo": {
-    "name": "app@latest",
-    "slug": "app-latest",
+    "name": "EcoSnap",
+    "slug": "ecosnap",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "applatest",
+    "icon": "./assets/images/leaf-icon.png",
+    "scheme": "ecosnap",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/images/leaf-icon.png"
     },
     "android": {
-      "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
-      },
+      "icon": "./assets/images/leaf-icon.png",
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.applatest"
+      "package": "com.anonymous.ecosnap"
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/leaf-icon.png"
     },
     "plugins": [
       "expo-router",

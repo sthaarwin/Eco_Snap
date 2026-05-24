@@ -13,9 +13,13 @@ export default function SignupScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <View style={styles.decorTop} />
+      <View style={styles.decorBottom} />
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.logoWrap}>
-          <Text style={styles.logoMark}>eco</Text>
+          <View style={styles.logoBadge}>
+            <Text style={styles.logoBadgeText}>🍃</Text>
+          </View>
           <Text style={styles.logoText}>EcoSnap</Text>
           <Text style={styles.subtitle}>Join the mission to restore and protect our planet.</Text>
         </View>
@@ -63,7 +67,7 @@ export default function SignupScreen() {
           <View style={styles.footerRow}>
             <Text style={styles.footerText}>Already have an account?</Text>
             <Link href="/" style={styles.footerLink}>
-              Log In
+              Login
             </Link>
           </View>
         </View>
@@ -77,6 +81,24 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: EcoColors.background,
   },
+  decorTop: {
+    position: 'absolute',
+    width: 260,
+    height: 260,
+    borderRadius: EcoRadius.pill,
+    backgroundColor: 'rgba(34, 197, 94, 0.12)',
+    top: -120,
+    left: -90,
+  },
+  decorBottom: {
+    position: 'absolute',
+    width: 260,
+    height: 260,
+    borderRadius: EcoRadius.pill,
+    backgroundColor: 'rgba(14, 165, 233, 0.1)',
+    bottom: -120,
+    right: -90,
+  },
   container: {
     flexGrow: 1,
     padding: EcoSpacing.lg,
@@ -87,10 +109,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: EcoSpacing.sm,
   },
-  logoMark: {
-    color: EcoColors.primary,
-    fontSize: 36,
-    fontWeight: '700',
+  logoBadge: {
+    width: 56,
+    height: 56,
+    borderRadius: EcoRadius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#e9f8ee',
+  },
+  logoBadgeText: {
+    fontSize: 28,
+    lineHeight: 28,
   },
   logoText: {
     color: EcoColors.primary,

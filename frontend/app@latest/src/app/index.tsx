@@ -1,6 +1,7 @@
-import { Link, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
+  Image,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -26,7 +27,9 @@ export default function LoginScreen() {
 
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.logoWrap}>
-          <Text style={styles.logoMark}>eco</Text>
+          <View style={styles.logoBadge}>
+            <Text style={styles.logoBadgeText}>🍃</Text>
+          </View>
           <Text style={styles.logoText}>EcoSnap</Text>
           <Text style={styles.subtitle}>Initialize environmental monitoring node</Text>
         </View>
@@ -61,7 +64,7 @@ export default function LoginScreen() {
                 trackColor={{ false: '#d0d6d0', true: '#8cdca5' }}
                 thumbColor={remember ? EcoColors.primary : '#f4f4f4'}
               />
-              <Text style={styles.rememberText}>Remember node</Text>
+              <Text style={styles.rememberText}>Remember me</Text>
             </View>
             <Text style={styles.linkInline}>Forgot Password?</Text>
           </View>
@@ -71,15 +74,23 @@ export default function LoginScreen() {
           </Pressable>
 
           <Pressable style={styles.socialButton}>
-            <Text style={styles.socialText}>Continue with Google</Text>
+            <View style={styles.socialRow}>
+              <Image
+                source={{
+                  uri: 'https://www.gstatic.com/images/branding/product/1x/googleg_48dp.png',
+                }}
+                style={styles.googleLogo}
+              />
+              <Text style={styles.socialText}>Continue with Google</Text>
+            </View>
           </Pressable>
         </View>
 
         <View style={styles.footerRow}>
-          <Text style={styles.footerText}>New to the mission?</Text>
-          <Link href="/signup" style={styles.footerLink}>
-            Sign Up
-          </Link>
+          <Text style={styles.footerText}>Don't have an account?</Text>
+          <Pressable onPress={() => router.push('/signup')}>
+            <Text style={styles.footerLink}>Sign up</Text>
+          </Pressable>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -119,10 +130,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: EcoSpacing.sm,
   },
-  logoMark: {
-    color: EcoColors.primary,
-    fontSize: 36,
-    fontWeight: '700',
+  logoBadge: {
+    width: 56,
+    height: 56,
+    borderRadius: EcoRadius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#e9f8ee',
+  },
+  logoBadgeText: {
+    fontSize: 28,
+    lineHeight: 28,
   },
   logoText: {
     color: EcoColors.primary,
@@ -194,6 +212,15 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     alignItems: 'center',
     backgroundColor: EcoColors.surface,
+  },
+  socialRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: EcoSpacing.sm,
+  },
+  googleLogo: {
+    width: 18,
+    height: 18,
   },
   socialText: {
     color: EcoColors.text,
