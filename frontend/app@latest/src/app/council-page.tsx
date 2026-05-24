@@ -71,7 +71,7 @@ export default function CouncilPageScreen() {
       <View style={styles.actionColumn}>
         <Pressable
           onPress={handlePress}
-          style={primary ? styles.primaryButton : styles.secondaryButton}
+          style={[primary ? styles.primaryButton : styles.secondaryButton, { width: '100%' }]}
           accessibilityRole="button">
           <Animated.View style={{ transform: [{ translateY: anim }] }}>
             <Ionicons
