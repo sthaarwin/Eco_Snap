@@ -8,12 +8,12 @@ import { corsHeaders, supabaseAdmin } from '../_shared/supabase.ts'
 import { ApiError } from '../_shared/contracts.ts'
 
 const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY') || ''              // used ONLY for verify-image (vision)
-const GEMINI_DESCRIPTION_API_KEY = Deno.env.get('GEMINI_DESCRIPTION_API_KEY') || GEMINI_API_KEY  // used ONLY for generate-narrative (text)
+const GEMINI_DESCRIPTION_API_KEY = Deno.env.get('GEMINI_DESCRIPTION_API_KEY') || '' // used ONLY for generate-narrative (text)
 const AI_SERVICE_KEY = Deno.env.get('AI_SERVICE_KEY') || ''
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || ''
-const GEMINI_TEXT_MODEL = 'gemini-2.5-flash'
-const GEMINI_VISION_MODEL = 'gemini-2.5-flash'
-const FALLBACK_VISION_MODEL = 'gemini-2.0-flash'
+const GEMINI_TEXT_MODEL = 'gemini-1.5-flash'
+const GEMINI_VISION_MODEL = 'gemini-1.5-flash'
+const FALLBACK_VISION_MODEL = 'gemini-1.5-flash'
 
 const VERIFY_APPROVAL_CONFIDENCE = 0.85
 const VERIFY_REJECTION_CONFIDENCE = 0.75
