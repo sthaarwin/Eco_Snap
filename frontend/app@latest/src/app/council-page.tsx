@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Image, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import { EcoColors, EcoRadius, EcoSpacing } from '@/constants/ecosnap-theme';
 
@@ -83,11 +84,17 @@ export default function CouncilPageScreen() {
               </View>
 
               <View style={styles.actionRow}>
-                <Pressable style={styles.secondaryButton} onPress={() => complete(item.id)}>
-                  <Text style={styles.secondaryText}>Dislike</Text>
+                <Pressable
+                  style={styles.secondaryButton}
+                  onPress={() => complete(item.id)}
+                  accessibilityLabel="Dislike">
+                  <Ionicons name="thumbs-down" size={20} color={EcoColors.text} />
                 </Pressable>
-                <Pressable style={styles.primaryButton} onPress={() => complete(item.id)}>
-                  <Text style={styles.primaryText}>Like</Text>
+                <Pressable
+                  style={styles.primaryButton}
+                  onPress={() => complete(item.id)}
+                  accessibilityLabel="Like">
+                  <Ionicons name="thumbs-up" size={20} color="#fff" />
                 </Pressable>
               </View>
             </View>
