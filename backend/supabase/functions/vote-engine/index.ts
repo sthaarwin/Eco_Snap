@@ -13,11 +13,11 @@ serve(async (req) => {
   const supabase = createUserClient(req)
   const url = new URL(req.url)
   const method = req.method
-  const path = url.pathname.replace('/vote-engine', '')
+  const pathname = url.pathname
 
   try {
     // POST /vote - Cast a vote
-    if (method === 'POST' && path === '/vote') {
+    if (method === 'POST' && pathname.endsWith('/vote')) {
       const auth = await requireUser(req)
       if (auth.response) return auth.response
 
@@ -124,8 +124,8 @@ serve(async (req) => {
     }
 
     // GET /votes/:submission_id - Get tally for a submission
-    if (method === 'GET' && path.startsWith('/votes/')) {
-      const submissionId = path.split('/')[2]
+    if (method === 'GET' && pathname.includes('/votes/')) {
+      const submissionId = pathname.split('/').pop()
 
       const { data: votes, error } = await supabase
         .from('votes')

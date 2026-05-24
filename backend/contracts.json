@@ -24,6 +24,8 @@
     "image_url": "string",
     "confidence_score": "float|null",
     "verification_status": "string",
+    "ai_reasoning": "string|null",
+    "reward_awarded": "int|null",
     "created_at": "string"
   },
   "verification_result": {

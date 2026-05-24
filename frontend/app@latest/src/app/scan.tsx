@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { Platform, Pressable, StyleSheet, Text, View, Modal, Image, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { supabase } from '@/lib/supabase';
+import { Alert, Image, Modal, Platform, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { SUPABASE_URL, supabase } from '@/lib/supabase';
 
 import { EcoColors, EcoRadius, EcoSpacing } from '@/constants/ecosnap-theme';
 
@@ -11,9 +10,6 @@ export default function ScanScreen() {
   const cameraRef = useRef<CameraView | null>(null);
   const [permission, requestPermission] = useCameraPermissions();
   const router = useRouter();
-  const params = useLocalSearchParams<{ missionId?: string }>();
-
-  const [scannedValue, setScannedValue] = useState<string | null>(null);
   const [isTakingPicture, setIsTakingPicture] = useState(false);
 
   const [showPreviewModal, setShowPreviewModal] = useState(false);
@@ -27,11 +23,17 @@ export default function ScanScreen() {
     }
   }, [permission, requestPermission]);
 
-  const handleBarcodeScanned = ({ data, type }: { data: string; type: string }) => {
-    if (scannedValue) {
-      return;
-    }
-    setScannedValue(`${type}: ${data}`);
+  const resolveActiveMissionId = async () => {
+    const { data, error } = await supabase
+      .from('missions')
+      .select('id')
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data?.id ?? null;
   };
 
   const handleShutterPress = async () => {
@@ -43,18 +45,13 @@ export default function ScanScreen() {
 
     try {
       const photo = await cameraRef.current.takePictureAsync({
-        quality: 0.8,
+        quality: 0.35,
         base64: true,
         skipProcessing: true,
       });
 
-      if (!photo?.uri) {
-        Alert.alert('Photo error', 'Could not capture a photo. Please try again.');
-        return;
-      }
-
-      setCapturedPhotoUri(photo.uri);
-      setCapturedPhotoBase64(photo.base64 ? `data:image/jpeg;base64,${photo.base64}` : null);
+      setCapturedPhotoUri(photo?.uri ?? null);
+      setCapturedPhotoBase64(photo?.base64 ? `data:image/jpeg;base64,${photo.base64}` : null);
       setShowPreviewModal(true);
     } finally {
       setIsTakingPicture(false);
@@ -71,27 +68,29 @@ export default function ScanScreen() {
     if (!capturedPhotoBase64 || isUploading) {
       return;
     }
-    if (!params.missionId) {
-      Alert.alert('No active mission', 'Cannot upload: no mission ID provided.');
-      return;
-    }
 
     setIsUploading(true);
     try {
+      const missionId = await resolveActiveMissionId();
+      if (!missionId) {
+        Alert.alert('No active mission', 'There is no active mission available to attach this upload.');
+        return;
+      }
+
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) {
         throw new Error('Your session expired. Please sign in again.');
       }
 
       // We omit the edge-function URL explicitly to correctly map to Supabase edge function
-      const response = await fetch(`https://omrqdxvgkxqikkorsnwx.supabase.co/functions/v1/submission-engine/submit`, {
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/submission-engine/submit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
-          mission_id: params.missionId,
+          mission_id: missionId,
           image_base64: capturedPhotoBase64,
           latitude: 0,
           longitude: 0, // Using placeholders depending on logic, since coordinates check is done locally on map screen
@@ -180,7 +179,7 @@ export default function ScanScreen() {
               style={styles.cameraPreview}
               facing="back"
               barcodeScannerSettings={{ barcodeTypes: ['qr', 'ean13', 'ean8', 'code128'] }}
-              onBarcodeScanned={handleBarcodeScanned}
+
             />
           )}
 
@@ -195,7 +194,7 @@ export default function ScanScreen() {
             <Text style={styles.body}>
               Snap a photo of clearing the quest
             </Text>
-            {scannedValue ? <Text style={styles.result}>{scannedValue}</Text> : null}
+
           </View>
         </View>
 

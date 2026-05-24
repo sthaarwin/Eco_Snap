@@ -205,11 +205,8 @@ export default function LiveMapPageScreen() {
 
       setCurrentLocation(nextLocation);
 
-      setMapRegion((region) => ({
-        ...region,
-        latitude: nextLocation.latitude,
-        longitude: nextLocation.longitude,
-      }));
+      // Do not re-center the map automatically every pixel — allows user to freely pan
+      // while the internal engine still computes radii logic accurately.
 
       setLocationStatus(
         nextLocation.accuracy
@@ -511,13 +508,16 @@ export default function LiveMapPageScreen() {
 
         {activeTargetMission ? (
           <Pressable
-            style={styles.primaryButton}
+            style={[styles.primaryButton, !canClearQuest && { backgroundColor: '#9ca3af' }]}
+            disabled={!canClearQuest}
             onPress={() => {
-              router.push(`/scan?missionId=${activeTargetMission.id}`);
+              if (canClearQuest) {
+                router.push(`/scan?missionId=${activeTargetMission.id}`);
+              }
             }}
           >
             <Text style={styles.primaryText}>
-              {canClearQuest ? 'Scan to Verify Quest ✅' : 'Scan to Verify Quest'}
+              {canClearQuest ? 'Scan to Verify Quest' : 'Move Closer To Verify Quest'}
             </Text>
           </Pressable>
         ) : (

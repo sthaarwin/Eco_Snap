@@ -3,16 +3,29 @@
 // Core AI service: image verification, narrative generation, behavioral clustering
 
 import { serve } from 'https://deno.land/std@0.210.0/http/server.ts'
+import { encodeBase64 } from 'https://deno.land/std@0.210.0/encoding/base64.ts'
 import { corsHeaders, supabaseAdmin } from '../_shared/supabase.ts'
 import { ApiError } from '../_shared/contracts.ts'
 
-const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY') || ''
+const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY') || ''              // used ONLY for verify-image (vision)
+const GEMINI_DESCRIPTION_API_KEY = Deno.env.get('GEMINI_DESCRIPTION_API_KEY') || GEMINI_API_KEY  // used ONLY for generate-narrative (text)
 const AI_SERVICE_KEY = Deno.env.get('AI_SERVICE_KEY') || ''
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || ''
 const GEMINI_TEXT_MODEL = 'gemini-2.5-flash'
 const GEMINI_VISION_MODEL = 'gemini-2.5-flash'
+const FALLBACK_VISION_MODEL = 'gemini-2.0-flash'
 
-const VERIFY_CONFIDENCE_AUTO_APPROVE = 0.9
+const VERIFY_APPROVAL_CONFIDENCE = 0.85
+const VERIFY_REJECTION_CONFIDENCE = 0.75
+
+type VerificationVerdict = 'approved' | 'rejected' | 'needs_review'
+
+type GeminiVisionVerification = {
+  confidence_score: number
+  verdict: VerificationVerdict
+  label: string
+  ai_reasoning: string
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -21,21 +34,21 @@ serve(async (req) => {
 
   const url = new URL(req.url)
   const method = req.method
-  const path = url.pathname.replace('/ai-engine', '')
+  const pathname = url.pathname
 
   try {
-        // POST /verify-image - Verify a submission image via Gemini Vision
-    if (method === 'POST' && path === '/verify-image') {
+    // POST /verify-image - Verify a submission image via Gemini Vision
+    if (method === 'POST' && pathname.endsWith('/verify-image')) {
       return await handleVerifyImage(req)
     }
 
     // POST /generate-narrative - Generate mission narrative from weather data
-    if (method === 'POST' && path === '/generate-narrative') {
+    if (method === 'POST' && pathname.endsWith('/generate-narrative')) {
       return await handleGenerateNarrative(req)
     }
 
     // POST /cluster-users - Compute behavioral clusters for all users
-    if (method === 'POST' && path === '/cluster-users') {
+    if (method === 'POST' && pathname.endsWith('/cluster-users')) {
       return await handleClusterUsers(req)
     }
 
@@ -123,7 +136,7 @@ async function handleVerifyImage(req: Request): Promise<Response> {
     body: JSON.stringify({
       submission_id: submission.id,
       confidence_score: result.confidence_score,
-      verdict: result.confidence_score > VERIFY_CONFIDENCE_AUTO_APPROVE ? 'approved' : 'needs_review',
+      verdict: result.verdict,
       ai_reasoning: result.ai_reasoning,
     }),
   })
@@ -143,6 +156,7 @@ async function handleVerifyImage(req: Request): Promise<Response> {
     JSON.stringify({
       submission_id: submission.id,
       confidence_score: result.confidence_score,
+      verification_status: receiverData.verdict,
       label: result.label,
       ai_reasoning: result.ai_reasoning,
       auto_approved: receiverData.auto_approved,
@@ -251,12 +265,12 @@ async function callGeminiText(prompt: string): Promise<{
   mission_type: string
   priority: number
 }> {
-  if (!GEMINI_API_KEY) {
+  if (!GEMINI_DESCRIPTION_API_KEY) {
     return getMockNarrative()
   }
 
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_TEXT_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_TEXT_MODEL}:generateContent?key=${GEMINI_DESCRIPTION_API_KEY}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -277,7 +291,7 @@ async function callGeminiText(prompt: string): Promise<{
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
 
   try {
-    const cleaned = text.replace(/```json|```/g, '').trim()
+    const cleaned = extractJson(text)
     return JSON.parse(cleaned)
   } catch {
     return getMockNarrative()
@@ -287,49 +301,90 @@ async function callGeminiText(prompt: string): Promise<{
 async function callGeminiVision(
   imageBase64: string,
   missionNarrative: string,
-): Promise<{
-  confidence_score: number
-  label: string
-  ai_reasoning: string
-}> {
+  model = GEMINI_VISION_MODEL,
+): Promise<GeminiVisionVerification> {
   if (!GEMINI_API_KEY) {
     return getMockVerification()
   }
 
   const prompt = buildVerificationPrompt(missionNarrative)
 
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_VISION_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [
-            { text: prompt },
-            { inline_data: { mime_type: 'image/jpeg', data: imageBase64 } },
-          ],
-        }],
-        generationConfig: { temperature: 0.2, maxOutputTokens: 256 },
-      }),
-    },
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { text: prompt },
+              { inline_data: { mime_type: 'image/jpeg', data: imageBase64 } },
+            ],
+          }],
+          generationConfig: { temperature: 0.2, maxOutputTokens: 256 },
+        }),
+      },
+    )
+
+    if (!res.ok) {
+      const errText = await res.text()
+      console.error(`Gemini Vision API error (${model}):`, res.status, errText)
+
+      // Fallback logic
+      if (model !== FALLBACK_VISION_MODEL) {
+        console.log(`Retrying with fallback model: ${FALLBACK_VISION_MODEL}`)
+        return await callGeminiVision(imageBase64, missionNarrative, FALLBACK_VISION_MODEL)
+      }
+      return getMockVerification()
+    }
+
+    const data = await res.json()
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+
+    try {
+      const cleaned = extractJson(text)
+      return normalizeVisionVerification(JSON.parse(cleaned))
+    } catch (parseErr) {
+      console.error('Failed to parse Gemini Vision JSON:', parseErr, 'Raw text:', text)
+      return getMockVerification()
+    }
+  } catch (err) {
+    console.error(`Unexpected error in callGeminiVision (${model}):`, err)
+    if (model !== FALLBACK_VISION_MODEL) {
+      return await callGeminiVision(imageBase64, missionNarrative, FALLBACK_VISION_MODEL)
+    }
+    return getMockVerification()
+  }
+}
+
+function normalizeVisionVerification(raw: any): GeminiVisionVerification {
+  const confidenceScore = clampConfidence(
+    typeof raw?.confidence_score === 'number'
+      ? raw.confidence_score
+      : parseFloat(String(raw?.confidence_score || 0)),
   )
 
-  if (!res.ok) {
-    const errText = await res.text()
-    console.error('Gemini Vision API error:', res.status, errText)
-    return getMockVerification()
+  const rawVerdict = String(raw?.verdict || '').toLowerCase()
+  let verdict: VerificationVerdict = 'needs_review'
+
+  if (rawVerdict === 'approved' && confidenceScore >= VERIFY_APPROVAL_CONFIDENCE) {
+    verdict = 'approved'
+  } else if (rawVerdict === 'rejected' && confidenceScore >= VERIFY_REJECTION_CONFIDENCE) {
+    verdict = 'rejected'
   }
 
-  const data = await res.json()
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-
-  try {
-    const cleaned = text.replace(/```json|```/g, '').trim()
-    return JSON.parse(cleaned)
-  } catch {
-    return getMockVerification()
+  return {
+    confidence_score: confidenceScore,
+    verdict,
+    label: String(raw?.label || 'ambiguous').trim() || 'ambiguous',
+    ai_reasoning: String(raw?.ai_reasoning || 'No specific reasoning provided by AI.').trim(),
   }
+}
+
+function clampConfidence(value: number): number {
+  if (isNaN(value) || !isFinite(value)) return 0
+  return Math.max(0, Math.min(1, value))
 }
 
 // ─── Image Download ────────────────────────────────────────────────────────
@@ -338,13 +393,15 @@ async function downloadImageAsBase64(imageUrl: string): Promise<string> {
   const res = await fetch(imageUrl)
   if (!res.ok) throw new Error(`Failed to fetch image: ${res.status}`)
 
-  const blob = await res.arrayBuffer()
-  const bytes = new Uint8Array(blob)
-  let binary = ''
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i])
-  }
-  return btoa(binary)
+  const arrayBuffer = await res.arrayBuffer()
+  return encodeBase64(arrayBuffer)
+}
+
+function extractJson(text: string): string {
+  // Matches either raw JSON or JSON inside markdown code blocks
+  const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
+  if (jsonMatch) return jsonMatch[1].trim()
+  return text.trim()
 }
 
 // ─── Prompt Builders ───────────────────────────────────────────────────────
@@ -381,14 +438,17 @@ function buildVerificationPrompt(missionNarrative: string): string {
 
 Mission: "${missionNarrative}"
 
-Analyze the submitted photo. Determine if it shows PROOF that the mission was actually completed.
-- If the photo clearly shows waste collection, cleaned area, or relevant environmental action, accept it.
-- If the photo is unrelated (random object, selfie, landscape with no waste context, or ambiguous), reject it.
-- Be strict — staged photos with no real cleanup evidence should be rejected.
+Analyze the submitted photo and choose exactly one outcome:
+- "approved": the photo clearly proves the assigned environmental mission was completed or shows directly relevant cleanup/action evidence.
+- "rejected": the photo is clearly invalid, unrelated, a selfie, a random object, blank/blocked, too blurry/dark to inspect, or clearly does not match the mission.
+- "needs_review": the photo has some relevant environmental context but is ambiguous, partially visible, or not strong enough for automatic approval/rejection.
+
+Be strict. Use council review only for genuinely uncertain cases, not obviously valid or obviously invalid images.
 
 Respond with EXACTLY this JSON (no markdown, no code fences, raw JSON only):
 {
-  "confidence_score": number (0.0-1.0, where 1.0 is certain the mission was completed),
+  "confidence_score": number (0.0-1.0, where 1.0 is certain the chosen verdict is correct),
+  "verdict": "string (one of: approved | rejected | needs_review)",
   "label": "string (one of: plastic_waste | paper_waste | organic_waste | mixed_waste | cleaned_area | unrelated | ambiguous)",
   "ai_reasoning": "string (1-2 sentences explaining the verification decision)"
 }`
@@ -420,10 +480,11 @@ function getMockNarrative() {
   }
 }
 
-function getMockVerification() {
+function getMockVerification(): GeminiVisionVerification {
   return {
-    confidence_score: 0.75,
-    label: 'mixed_waste',
-    ai_reasoning: 'AI verification unavailable or Gemini call failed. Defaulting to needs_review.',
+    confidence_score: 0,
+    verdict: 'needs_review',
+    label: 'ambiguous',
+    ai_reasoning: 'AI verification unavailable, model failed, or fallback exhausted. Manual review required.',
   }
 }
