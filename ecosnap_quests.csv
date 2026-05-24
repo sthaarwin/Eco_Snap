@@ -1,0 +1,101 @@
+id,quest_title,description,category,difficulty,xp_reward,priority,verification_type,location_hint
+1,Clear Trail Blockage,Find and report waste blocking a walking trail,cleanup,easy,80,2,photo_and_location,Riverside trail
+2,River Plastic Patrol,Spot plastic waste near a river and submit a clear report,water,easy,90,2,photo_and_location,Riverbank
+3,High-Risk Hotspot Check,Visit a high-risk hotspot and document the visible issue,hotspot,medium,120,1,photo_and_location,Live map hotspot
+4,Clear Photo Report,Submit a sharp well-lit photo of an environmental problem,reporting,easy,70,3,photo,Any mission area
+5,Accurate Location Scout,Submit a mission report with precise GPS location,reporting,easy,70,3,location,Any mission area
+6,Neighborhood Waste Sweep,Collect or report small non-biodegradable waste in your area,cleanup,easy,85,3,photo_and_location,Neighborhood street
+7,Reuse Reminder,Document one reusable item replacing a single-use item,awareness,easy,60,3,photo,Home or school
+8,Wildlife Safety Sweep,Report trash that could harm animals,cleanup,easy,95,2,photo_and_location,Park or riverbank
+9,Good Weather Mission Window,Complete a cleanup during safe mild weather,weather,easy,90,3,photo_and_location,Outdoor cleanup zone
+10,Hazard Warning Report,Report unknown chemical or unsafe waste without touching it,safety,medium,130,1,photo_and_location,Industrial or roadside area
+11,Biodegradable Sort,Separate biodegradable waste from other trash and document it,waste_sorting,easy,75,3,photo,Home or community bin
+12,Nature-Friendly Waste Pick,Identify and remove safe organic litter from a public space,cleanup,easy,65,3,photo,Park or garden
+13,Wet Dry Waste Setup,Create or report separate wet and dry waste bins,waste_sorting,easy,85,3,photo,Home school or office
+14,Hotspot Discovery,Find a new pollution hotspot and submit it with location,hotspot,medium,125,2,photo_and_location,Any polluted area
+15,Verified Action Streak,Complete one verified environmental action for XP,rewards,easy,70,3,photo_and_location,Any mission area
+16,Broken Glass Alert,Mark broken glass as unsafe and report it clearly,safety,medium,120,1,photo_and_location,Street or park
+17,Before After Cleanup,Submit before and after photos of a cleaned spot,cleanup,medium,150,2,before_after_photo,Any cleanup area
+18,Community Vote Review,Review a submitted cleanup report and vote honestly,council,easy,60,3,vote,Council page
+19,Stream Protection Task,Prioritize waste that is entering or near a stream,water,medium,140,1,photo_and_location,Stream edge
+20,Downstream Defender,Remove or report trash that could flow downstream,water,easy,100,2,photo_and_location,River or drain
+21,Rain Runoff Watch,After rain identify trash washed toward water or drains,weather,medium,130,2,photo_and_location,Street drain
+22,Weather Trigger Scout,Check a weather-triggered mission and report field conditions,weather,easy,100,2,photo_and_location,Weather mission area
+23,Severity Signal,Classify a hotspot as low medium or high based on visible risk,hotspot,easy,85,3,photo_and_location,Live map hotspot
+24,Overflowing Bin Report,Report an overflowing public bin before litter spreads,waste,easy,80,2,photo_and_location,Public bin
+25,Light Debris Cleanup,Remove safe light debris from a mission area,cleanup,easy,90,3,photo_and_location,Park trail or roadside
+26,Recyclable Finder,Identify recyclable waste and submit a sorted photo,waste_sorting,easy,75,3,photo,Recycling area
+27,Plastic Bag Rescue,Remove or report plastic bags near animals or water,cleanup,easy,95,2,photo_and_location,Park riverbank or street
+28,Water Safety Check,Inspect a water mission area from a safe distance,safety,easy,80,2,photo_and_location,Near water
+29,Team Cleanup Run,Complete a cleanup with at least one teammate,community,medium,140,2,group_photo,Community area
+30,Clear Mission Summary,Submit a short mission note explaining the environmental goal,reporting,easy,65,3,text_and_photo,Any mission area
+31,Active Mission Starter,Start and submit one active EcoSnap mission,missions,easy,90,3,photo_and_location,Active mission zone
+32,Priority Mission First,Complete a higher priority mission before a lower priority one,missions,medium,130,1,photo_and_location,Mission queue
+33,Methane Spike Check,Investigate a methane spike alert from a safe distance,air,hard,180,1,photo_and_location,Sensor alert area
+34,Sensor Station Visit,Report the condition around a local sensor station,sensors,easy,90,2,photo_and_location,Sensor station
+35,AI-Friendly Photo,Take a centered clear photo that is easy for AI to verify,reporting,easy,70,3,photo,Any mission area
+36,Low-Light Retake,Retake a blurry or dark report photo in better lighting,reporting,easy,65,3,photo,Any mission area
+37,River Cluster Report,Document a cluster of plastic waste along a river,water,medium,140,1,photo_and_location,Riverbank
+38,Bottle Trail Sweep,Collect or report plastic bottles near a trail,cleanup,easy,90,2,photo_and_location,Trail or walkway
+39,School Eco Scout,Find one environmental issue around a school and report it,community,easy,85,2,photo_and_location,School area
+40,XP Challenge Mission,Complete a simple cleanup challenge for points,rewards,easy,80,3,photo_and_location,Any cleanup area
+41,Council Review Case,Flag a suspicious submission for council review,council,medium,110,2,vote,Council page
+42,Fraud-Free Report,Submit an honest report with real photo evidence,reporting,easy,70,3,photo_and_location,Any mission area
+43,GPS Proof Mission,Complete a mission where GPS confirms the location,reporting,easy,80,3,photo_and_location,Any mission area
+44,Safe Path Mission,Report a problem without leaving safe public paths,safety,easy,75,3,photo_and_location,Trail or street
+45,Event Litter Watch,Report litter after an outdoor event,cleanup,easy,85,2,photo_and_location,Event area
+46,Close Solved Mission,Submit proof that a mission area has been cleaned,missions,easy,100,2,before_after_photo,Mission area
+47,Cleaner Street Tracker,Take a progress photo of a location improving over time,impact,easy,90,3,photo,Neighborhood street
+48,Repeat Pollution Report,Report a location where trash keeps coming back,hotspot,medium,120,2,photo_and_location,Repeated hotspot
+49,Risk Upgrade Check,Check if a low-risk hotspot has become medium-risk,hotspot,easy,95,2,photo_and_location,Live map hotspot
+50,Fast Local Alert,Submit a fresh local observation before it gets worse,reporting,easy,85,2,photo_and_location,Nearby issue
+51,No-Burn Waste Alert,Report plastic or mixed waste being burned in open air,air,medium,150,1,photo_and_location,Open burning area
+52,Air Quality Watch,Document smoke or plastic-burning pollution safely,air,medium,150,1,photo_and_location,Smoke source
+53,Tree Buffer Check,Report healthy or damaged trees protecting a riverbank,nature,easy,90,3,photo_and_location,River edge
+54,Food Plastic Separation,Separate food waste from plastic waste and document it,waste_sorting,easy,75,3,photo,Home or cafeteria
+55,Compost Starter,Create or report a simple composting setup,waste_sorting,easy,90,3,photo,Home garden or school
+56,Blocked Drain Priority,Clear or report a blocked drain before rain,water,medium,150,1,photo_and_location,Street drain
+57,Storm Drain Scout,Find a drain blocked by leaves trash or plastic,water,easy,100,2,photo_and_location,Street drain
+58,Flood Prevention Action,Help document a cleanup that reduces flood risk,water,medium,140,1,before_after_photo,Flood-prone street
+59,Gloves On Cleanup,Complete a cleanup using basic safety gear,safety,easy,85,3,photo,Any cleanup area
+60,Medical Waste Alert,Report medical waste without touching it,safety,hard,180,1,photo_and_location,Street bin or roadside
+61,Clean Water Watch,Report anything threatening clean local water,water,easy,100,2,photo_and_location,River stream or tap area
+62,School Litter Sweep,Report or clean litter near a school entrance,community,easy,90,2,photo_and_location,School entrance
+63,Invite A Scout,Bring a friend to join one EcoSnap mission,community,easy,80,3,group_photo,Any mission area
+64,Mission Queue Clear,Complete one pending mission from the queue,missions,easy,95,3,photo_and_location,Mission queue
+65,Live Feed Response,Respond to a new live feed environmental alert,hotspot,medium,120,2,photo_and_location,Alert location
+66,Simple Severity Tag,Tag a hotspot as high watch or stable with evidence,hotspot,easy,85,3,photo_and_location,Live map hotspot
+67,Stable Area Proof,Submit proof that a hotspot is now stable,impact,easy,100,2,photo_and_location,Stable hotspot
+68,Hotspot Recovery,Help reduce a high-risk hotspot and submit proof,impact,medium,160,1,before_after_photo,High-risk hotspot
+69,Truthful Scout Pledge,Submit a report with honest notes and real evidence,reporting,easy,65,3,text_and_photo,Any mission area
+70,Complete Scout Report,Submit a clear photo with location and a short note,reporting,easy,80,3,text_photo_location,Any mission area
+71,Small Action Chain,Complete one small cleanup action in a larger mission area,impact,easy,80,3,photo_and_location,Any mission area
+72,Level Up For Impact,Complete a mission that helps you gain XP and visible impact,rewards,easy,90,3,photo_and_location,Any mission area
+73,Reward Verified Cleanup,Finish a cleanup that can be verified before XP is awarded,rewards,easy,100,2,photo_and_location,Any mission area
+74,Embankment Waste Scan,Inspect an embankment for waste buildup,water,medium,130,2,photo_and_location,Embankment
+75,Post-Rain Embankment Check,Check an embankment after rain for new pollution,weather,medium,140,1,photo_and_location,Embankment after rain
+76,Windblown Trash Hunt,Find lightweight trash moved by wind,weather,easy,90,2,photo_and_location,Open street or field
+77,Wind Safety Delay,Report when strong wind makes cleanup unsafe,safety,easy,80,2,photo_and_location,Outdoor mission area
+78,Wet Waste Watch,Document waste affected by rain or humidity,waste,easy,85,3,photo_and_location,Outdoor bin or street
+79,Fast Water Safety,Report a water issue without entering fast-moving water,safety,medium,130,1,photo_and_location,River or stream
+80,Danger Hotspot Alert,Submit a safe-distance report for a dangerous hotspot,safety,hard,180,1,photo_and_location,Danger hotspot
+81,Location-Based Cleanup,Complete a cleanup tied to a specific map location,missions,easy,90,3,photo_and_location,Map marker
+82,City Dispatch Signal,Submit a report that helps workers choose a cleanup priority,council,medium,125,2,photo_and_location,Public area
+83,Timestamped Report,Submit a report showing when the problem was found,reporting,easy,70,3,photo_and_location,Any mission area
+84,Progress Photo Pair,Submit a new photo of a previously reported location,impact,easy,95,3,photo_and_location,Previous hotspot
+85,Expiring Mission Rush,Complete a mission before its deadline,missions,medium,130,2,photo_and_location,Expiring mission
+86,Sector Spillover Check,Check if pollution has spread into a nearby sector,hotspot,medium,120,2,photo_and_location,Nearby sector
+87,River First Response,Prioritize river pollution over low-risk park litter,water,medium,140,1,photo_and_location,River area
+88,Pollutant Category Tag,Tag waste as plastic metal glass organic or hazardous,waste_sorting,easy,85,3,photo,Any waste site
+89,Safe Debris Removal,Remove safe light debris like wrappers cups or bottles,cleanup,easy,90,3,photo_and_location,Any cleanup area
+90,Trained Worker Flag,Flag a problem that should be handled by professionals,safety,hard,180,1,photo_and_location,Hazard area
+91,Moderator Duty,Review a report using council moderation rules,council,medium,110,2,vote,Council page
+92,Trust Builder Report,Submit a detailed verified report that improves app trust,reporting,easy,95,3,text_photo_location,Any mission area
+93,Quick AI Approval,Submit a simple cleanup photo likely to pass AI verification,reporting,easy,80,3,photo,Any cleanup area
+94,Human Review Request,Send a complex or risky report for council review,council,medium,120,2,photo_and_location,Council page
+95,Public Proof Upload,Upload a clean evidence photo for public mission proof,reporting,easy,75,3,photo,Any mission area
+96,Visible Impact Post,Document an action that makes local impact visible,impact,easy,90,3,before_after_photo,Any cleanup area
+97,Impact Score Mission,Complete a mission with measurable local impact,impact,medium,140,2,photo_and_location,Mission area
+98,Objective-Focused Mission,Complete a mission exactly matching its brief,missions,easy,100,3,photo_and_location,Mission area
+99,Success Proof Report,Submit evidence that a cleanup mission succeeded,impact,easy,110,2,before_after_photo,Mission area
+100,Create Local Mission,Identify a real environmental problem that could become a new EcoSnap mission,missions,medium,130,2,photo_and_location,Your local area

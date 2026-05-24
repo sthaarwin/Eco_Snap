@@ -14,14 +14,27 @@ serve(async (req) => {
   const supabase = createUserClient(req)
   const url = new URL(req.url)
   const method = req.method
-  const path = url.pathname.replace('/functions/v1/mission-engine', '')
+  const path = url.pathname.replace('/mission-engine', '')
 
   try {
-    // GET /missions - List active missions
+    // GET /missions - List active missions (auto-expires ghosts past TTL)
     if (method === 'GET' && path === '/missions') {
       const status = url.searchParams.get('status') || 'active'
       const page = parseInt(url.searchParams.get('page') || '1')
       const pageSize = parseInt(url.searchParams.get('page_size') || '20')
+
+      // Expire missions past their TTL (ghost mission prevention)
+      await supabaseAdmin
+        .from('missions')
+        .update({ status: 'expired', updated_at: new Date().toISOString() })
+        .eq('status', 'active')
+        .lt('expires_at', new Date().toISOString())
+
+      await supabaseAdmin
+        .from('missions')
+        .update({ status: 'expired', updated_at: new Date().toISOString() })
+        .eq('status', 'in_progress')
+        .lt('expires_at', new Date().toISOString())
 
       const { data, error, count } = await supabase
         .from('missions')
@@ -70,6 +83,8 @@ serve(async (req) => {
 
       const body = await req.json()
 
+      const expiresAt = body.expires_at || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+
       const { data, error } = await supabase
         .from('missions')
         .insert({
@@ -79,7 +94,7 @@ serve(async (req) => {
           priority: body.priority || 1,
           location_name: body.location_name,
           weather_trigger: body.weather_trigger,
-          expires_at: body.expires_at,
+          expires_at: expiresAt,
           created_by: auth.user.id,
         })
         .select()
@@ -93,6 +108,7 @@ serve(async (req) => {
           coordinates: data.coordinates,
           status: 'active',
           severity: data.priority,
+          category: body.mission_type || 'standard_patrol',
           mission_id: data.id,
         })
 

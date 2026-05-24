@@ -1,3 +1,6 @@
 plan.md
 .env
 .env.local
+backend/supabase/.temp/
+backend/supabase/.branches/
+.csv
