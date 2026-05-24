@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import * as Location from 'expo-location';
 import { Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
 
 import { EcoColors, EcoRadius, EcoSpacing } from '@/constants/ecosnap-theme';
 import { supabase } from '@/lib/supabase';
-import { MapView, Marker } from '@/components/map-view';
+import { MapView, Marker, Polyline } from '@/components/map-view';
 
 type Hotspot = {
   id: string;
@@ -30,10 +31,14 @@ const DEFAULT_REGION = {
 };
 
 export default function LiveMapPageScreen() {
+  const params = useLocalSearchParams<{ tracking?: string, missionId?: string }>();
+  const isTracking = params.tracking === 'true';
+
   const [hotspots, setHotspots] = useState<Hotspot[]>([]);
   const [currentLocation, setCurrentLocation] = useState<CurrentLocation | null>(null);
   const [mapRegion, setMapRegion] = useState(DEFAULT_REGION);
   const [locationStatus, setLocationStatus] = useState('Finding your GPS location...');
+  const [pathCoordinates, setPathCoordinates] = useState<{ latitude: number; longitude: number }[]>([]);
 
   useEffect(() => {
     const fetchHotspots = async () => {
@@ -91,6 +96,13 @@ export default function LiveMapPageScreen() {
           ? `Current location accurate to ${Math.round(nextLocation.accuracy)}m`
           : 'Current GPS location active',
       );
+
+      if (isTracking) {
+        setPathCoordinates((prev) => [
+          ...prev,
+          { latitude: nextLocation.latitude, longitude: nextLocation.longitude },
+        ]);
+      }
     };
 
     const startLocationTracking = async () => {
@@ -138,7 +150,7 @@ export default function LiveMapPageScreen() {
       isMounted = false;
       locationSubscription?.remove();
     };
-  }, []);
+  }, [isTracking]);
 
   const severityColor = (severity: number) => {
     if (severity >= 4) return '#ef4444';
@@ -202,6 +214,14 @@ export default function LiveMapPageScreen() {
               showsMyLocationButton
               showsUserLocation
             >
+              {isTracking && pathCoordinates.length > 1 && (
+                <Polyline
+                  coordinates={pathCoordinates}
+                  strokeColor="#ef4444"
+                  strokeWidth={4}
+                />
+              )}
+
               {currentLocation ? (
                 <Marker
                   coordinate={currentLocation}
