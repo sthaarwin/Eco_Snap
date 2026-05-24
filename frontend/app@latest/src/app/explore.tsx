@@ -1,179 +1,337 @@
-import { Image, Platform, Pressable, ScrollView, StyleSheet, Text } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  Image,
+  Pressable,
+  RefreshControl,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
-import { ExternalLink } from '@/components/external-link';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Collapsible } from '@/components/ui/collapsible';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { EcoColors, EcoRadius, EcoSpacing } from '@/constants/ecosnap-theme';
+import { supabase } from '@/lib/supabase';
 
-export default function TabTwoScreen() {
-  const safeAreaInsets = useSafeAreaInsets();
-  const insets = {
-    ...safeAreaInsets,
-    bottom: safeAreaInsets.bottom + BottomTabInset + Spacing.three,
+type ProfileRank = {
+  id: string;
+  username: string;
+  xp: number;
+  level: number;
+  role: string | null;
+  avatar_url?: string;
+};
+
+export default function ExploreScreen() {
+  const [rankings, setRankings] = useState<ProfileRank[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const fetchRankings = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, username, xp, level, role')
+      .order('xp', { ascending: false })
+      .limit(50);
+
+    if (!error && data) {
+      setRankings(data as ProfileRank[]);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchRankings().finally(() => setIsLoading(false));
+  }, [fetchRankings]);
+
+  const onRefresh = async () => {
+    setIsRefreshing(true);
+    await fetchRankings();
+    setIsRefreshing(false);
   };
-  const theme = useTheme();
 
-  const contentPlatformStyle = Platform.select({
-    android: {
-      paddingTop: insets.top,
-      paddingLeft: insets.left,
-      paddingRight: insets.right,
-      paddingBottom: insets.bottom,
-    },
-    web: {
-      paddingTop: Spacing.six,
-      paddingBottom: Spacing.four,
-    },
-  });
+  const renderRankingItem = ({ item, index }: { item: ProfileRank; index: number }) => {
+    // Skip top 3 for the list as they are in the podium
+    if (index < 3) return null;
+
+    return (
+      <View style={styles.rankItem}>
+        <View style={styles.rankBadge}>
+          <Text style={styles.rankNumber}>{index + 1}</Text>
+        </View>
+        <View style={styles.rankInfo}>
+          <Text style={styles.rankName}>{item.username || 'Anonymous Scout'}</Text>
+          <Text style={styles.rankRole}>{item.role?.toUpperCase() || 'SCOUT'} • LVL {item.level}</Text>
+        </View>
+        <View style={styles.rankXpContainer}>
+          <Text style={styles.rankXpValue}>{item.xp}</Text>
+          <Text style={styles.rankXpLabel}>XP</Text>
+        </View>
+      </View>
+    );
+  };
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.loadingState}>
+          <ActivityIndicator color={EcoColors.primary} size="large" />
+          <Text style={styles.loadingText}>Fetching Global Rankings...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const top3 = rankings.slice(0, 3);
+  const remaining = rankings; // FlatList handles the index < 3 check
 
   return (
-    <ScrollView
-      style={[styles.scrollView, { backgroundColor: theme.background }]}
-      contentInset={insets}
-      contentContainerStyle={[styles.contentContainer, contentPlatformStyle]}>
-      <ThemedView style={styles.container}>
-        <ThemedView style={styles.titleContainer}>
-          <ThemedText type="subtitle">Explore</ThemedText>
-          <ThemedText style={styles.centerText} themeColor="textSecondary">
-            This starter app includes example{'\n'}code to help you get started.
-          </ThemedText>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Global Rankings</Text>
+        <Text style={styles.subtitle}>Top environmental scouts across the grid.</Text>
+      </View>
 
-          <ExternalLink href="https://docs.expo.dev" asChild>
-            <Pressable style={({ pressed }) => pressed && styles.pressed}>
-              <ThemedView type="backgroundElement" style={styles.linkButton}>
-                <ThemedText type="link">Expo documentation</ThemedText>
-                <Text style={[styles.inlineIcon, { color: theme.text }]}>↗</Text>
-              </ThemedView>
-            </Pressable>
-          </ExternalLink>
-        </ThemedView>
+      <FlatList
+        data={remaining}
+        keyExtractor={(item) => item.id}
+        renderItem={renderRankingItem}
+        contentContainerStyle={styles.listContainer}
+        refreshControl={
+          <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={EcoColors.primary} />
+        }
+        ListHeaderComponent={
+          <>
+            <View style={styles.podiumContainer}>
+              {/* Second Place */}
+              {top3[1] && (
+                <View style={[styles.podiumSpot, styles.podiumSecond]}>
+                  <View style={styles.podiumAvatarWrap}>
+                    <View style={[styles.avatarCircle, { backgroundColor: '#E2E8F0' }]}>
+                      <Text style={styles.avatarInitial}>{top3[1].username[0]?.toUpperCase()}</Text>
+                    </View>
+                    <View style={styles.podiumBadge}>
+                      <Text style={styles.podiumBadgeText}>2</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.podiumName} numberOfLines={1}>{top3[1].username}</Text>
+                  <Text style={styles.podiumXp}>{top3[1].xp} XP</Text>
+                  <View style={[styles.podiumBase, { height: 60, backgroundColor: '#cbd5e1' }]} />
+                </View>
+              )}
 
-        <ThemedView style={styles.sectionsWrapper}>
-          <Collapsible title="File-based routing">
-            <ThemedText type="small">
-              This app has two screens: <ThemedText type="code">src/app/index.tsx</ThemedText> and{' '}
-              <ThemedText type="code">src/app/explore.tsx</ThemedText>
-            </ThemedText>
-            <ThemedText type="small">
-              The layout file in <ThemedText type="code">src/app/_layout.tsx</ThemedText> sets up
-              the tab navigator.
-            </ThemedText>
-            <ExternalLink href="https://docs.expo.dev/router/introduction">
-              <ThemedText type="linkPrimary">Learn more</ThemedText>
-            </ExternalLink>
-          </Collapsible>
+              {/* First Place */}
+              {top3[0] && (
+                <View style={[styles.podiumSpot, styles.podiumFirst]}>
+                  <Ionicons name="trophy" size={24} color="#F59E0B" style={styles.trophyIcon} />
+                  <View style={styles.podiumAvatarWrap}>
+                    <View style={[styles.avatarCircle, { backgroundColor: '#FEF3C7', borderColor: '#F59E0B', borderWidth: 2 }]}>
+                      <Text style={[styles.avatarInitial, { color: '#F59E0B' }]}>{top3[0].username[0]?.toUpperCase()}</Text>
+                    </View>
+                    <View style={[styles.podiumBadge, { backgroundColor: '#F59E0B' }]}>
+                      <Text style={styles.podiumBadgeText}>1</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.podiumName, { fontWeight: '800' }]} numberOfLines={1}>{top3[0].username}</Text>
+                  <Text style={[styles.podiumXp, { color: '#F59E0B' }]}>{top3[0].xp} XP</Text>
+                  <View style={[styles.podiumBase, { height: 90, backgroundColor: '#f59e0b' }]} />
+                </View>
+              )}
 
-          <Collapsible title="Android, iOS, and web support">
-            <ThemedView type="backgroundElement" style={styles.collapsibleContent}>
-              <ThemedText type="small">
-                You can open this project on Android, iOS, and the web. To open the web version,
-                press <ThemedText type="smallBold">w</ThemedText> in the terminal running this
-                project.
-              </ThemedText>
-              <Image
-                source={require('@/assets/images/tutorial-web.png')}
-                style={styles.imageTutorial}
-              />
-            </ThemedView>
-          </Collapsible>
-
-          <Collapsible title="Images">
-            <ThemedText type="small">
-              For static images, you can use the <ThemedText type="code">@2x</ThemedText> and{' '}
-              <ThemedText type="code">@3x</ThemedText> suffixes to provide files for different
-              screen densities.
-            </ThemedText>
-            <Image source={require('@/assets/images/react-logo.png')} style={styles.imageReact} />
-            <ExternalLink href="https://reactnative.dev/docs/images">
-              <ThemedText type="linkPrimary">Learn more</ThemedText>
-            </ExternalLink>
-          </Collapsible>
-
-          <Collapsible title="Light and dark mode components">
-            <ThemedText type="small">
-              This template has light and dark mode support. The{' '}
-              <ThemedText type="code">useColorScheme()</ThemedText> hook lets you inspect what the
-              user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-            </ThemedText>
-            <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-              <ThemedText type="linkPrimary">Learn more</ThemedText>
-            </ExternalLink>
-          </Collapsible>
-
-          <Collapsible title="Animations">
-            <ThemedText type="small">
-              This template includes an example of an animated component. The{' '}
-              <ThemedText type="code">src/components/ui/collapsible.tsx</ThemedText> component uses
-              the powerful <ThemedText type="code">react-native-reanimated</ThemedText> library to
-              animate opening this hint.
-            </ThemedText>
-          </Collapsible>
-        </ThemedView>
-        {Platform.OS === 'web' && <WebBadge />}
-      </ThemedView>
-    </ScrollView>
+              {/* Third Place */}
+              {top3[2] && (
+                <View style={[styles.podiumSpot, styles.podiumThird]}>
+                  <View style={styles.podiumAvatarWrap}>
+                    <View style={[styles.avatarCircle, { backgroundColor: '#FFEDD5' }]}>
+                      <Text style={styles.avatarInitial}>{top3[2].username[0]?.toUpperCase()}</Text>
+                    </View>
+                    <View style={[styles.podiumBadge, { backgroundColor: '#92400E' }]}>
+                      <Text style={styles.podiumBadgeText}>3</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.podiumName} numberOfLines={1}>{top3[2].username}</Text>
+                  <Text style={styles.podiumXp}>{top3[2].xp} XP</Text>
+                  <View style={[styles.podiumBase, { height: 40, backgroundColor: '#92400e' }]} />
+                </View>
+              )}
+            </View>
+            <View style={styles.divider} />
+          </>
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyText}>No scouts ranked yet. Be the first!</Text>
+          </View>
+        }
+      />
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  scrollView: {
+  safeArea: {
     flex: 1,
+    backgroundColor: EcoColors.background,
   },
-  contentContainer: {
+  loadingState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: EcoSpacing.sm,
+  },
+  loadingText: {
+    color: EcoColors.textMuted,
+    fontWeight: '600',
+  },
+  header: {
+    padding: EcoSpacing.lg,
+    paddingBottom: EcoSpacing.sm,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: EcoColors.text,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: EcoColors.textMuted,
+    marginTop: 4,
+  },
+  listContainer: {
+    paddingHorizontal: EcoSpacing.lg,
+    paddingBottom: EcoSpacing.xl,
+  },
+  podiumContainer: {
     flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    marginTop: EcoSpacing.lg,
+    marginBottom: EcoSpacing.lg,
+    height: 220,
+  },
+  podiumSpot: {
+    alignItems: 'center',
+    width: '30%',
+  },
+  podiumFirst: {
+    zIndex: 2,
+    marginHorizontal: -10,
+  },
+  podiumSecond: {
+    zIndex: 1,
+  },
+  podiumThird: {
+    zIndex: 1,
+  },
+  podiumAvatarWrap: {
+    position: 'relative',
+    marginBottom: 8,
+  },
+  avatarCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#cbd5e1',
+    alignItems: 'center',
     justifyContent: 'center',
   },
-  container: {
-    maxWidth: MaxContentWidth,
-    flexGrow: 1,
+  avatarInitial: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#475569',
   },
-  titleContainer: {
-    gap: Spacing.three,
+  podiumBadge: {
+    position: 'absolute',
+    bottom: -4,
+    right: -4,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#94a3b8',
     alignItems: 'center',
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.six,
-  },
-  centerText: {
-    textAlign: 'center',
-  },
-  pressed: {
-    opacity: 0.7,
-  },
-  linkButton: {
-    flexDirection: 'row',
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.five,
     justifyContent: 'center',
-    gap: Spacing.one,
-    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
   },
-  inlineIcon: {
+  podiumBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  podiumName: {
     fontSize: 12,
     fontWeight: '700',
-    lineHeight: 12,
+    color: EcoColors.text,
+    textAlign: 'center',
   },
-  sectionsWrapper: {
-    gap: Spacing.five,
-    paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.three,
+  podiumXp: {
+    fontSize: 11,
+    color: EcoColors.textMuted,
+    marginBottom: 8,
   },
-  collapsibleContent: {
+  podiumBase: {
+    width: '90%',
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+  },
+  trophyIcon: {
+    marginBottom: 4,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: EcoColors.border,
+    marginVertical: EcoSpacing.md,
+  },
+  rankItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: EcoSpacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: EcoColors.border,
+  },
+  rankBadge: {
+    width: 30,
     alignItems: 'center',
   },
-  imageTutorial: {
-    width: '100%',
-    aspectRatio: 296 / 171,
-    borderRadius: Spacing.three,
-    marginTop: Spacing.two,
+  rankNumber: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: EcoColors.textMuted,
   },
-  imageReact: {
-    width: 100,
-    height: 100,
-    alignSelf: 'center',
+  rankInfo: {
+    flex: 1,
+    marginLeft: EcoSpacing.md,
+  },
+  rankName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: EcoColors.text,
+  },
+  rankRole: {
+    fontSize: 11,
+    color: EcoColors.textMuted,
+    fontWeight: '600',
+  },
+  rankXpContainer: {
+    alignItems: 'flex-end',
+  },
+  rankXpValue: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: EcoColors.primary,
+  },
+  rankXpLabel: {
+    fontSize: 10,
+    color: EcoColors.textMuted,
+    fontWeight: '700',
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: EcoSpacing.xl,
+  },
+  emptyText: {
+    color: EcoColors.textMuted,
+    fontStyle: 'italic',
   },
 });
