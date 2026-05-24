@@ -89,6 +89,7 @@ export interface HotspotResponse {
   coordinates: { lat: number; lng: number };
   status: 'active' | 'resolved';
   severity: number;
+  category: 'emergency_drainage' | 'plastic_drift' | 'standard_patrol' | 'cafeteria_overflow' | 'green_restoration';
   mission_id: string | null;
   created_at: string;
 }

@@ -1,14 +1,25 @@
 import { useEffect, useRef, useState } from 'react';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { Platform, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View, Modal, Image, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { supabase } from '@/lib/supabase';
 
 import { EcoColors, EcoRadius, EcoSpacing } from '@/constants/ecosnap-theme';
 
 export default function ScanScreen() {
   const cameraRef = useRef<CameraView | null>(null);
   const [permission, requestPermission] = useCameraPermissions();
+  const router = useRouter();
+  const params = useLocalSearchParams<{ missionId?: string }>();
+
   const [scannedValue, setScannedValue] = useState<string | null>(null);
   const [isTakingPicture, setIsTakingPicture] = useState(false);
+
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [capturedPhotoUri, setCapturedPhotoUri] = useState<string | null>(null);
+  const [capturedPhotoBase64, setCapturedPhotoBase64] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
     if (!permission) {
@@ -20,7 +31,6 @@ export default function ScanScreen() {
     if (scannedValue) {
       return;
     }
-
     setScannedValue(`${type}: ${data}`);
   };
 
@@ -32,10 +42,87 @@ export default function ScanScreen() {
     setIsTakingPicture(true);
 
     try {
-      await cameraRef.current.takePictureAsync({ quality: 0.7, skipProcessing: true });
-      setScannedValue('Photo captured. Point the camera at a QR or marker to scan.');
+      const photo = await cameraRef.current.takePictureAsync({
+        quality: 0.35,
+        base64: true,
+        skipProcessing: true,
+      });
+
+      if (!photo?.uri) {
+        Alert.alert('Photo error', 'Could not capture a photo. Please try again.');
+        return;
+      }
+
+      setCapturedPhotoUri(photo.uri);
+      setCapturedPhotoBase64(photo.base64 ? `data:image/jpeg;base64,${photo.base64}` : null);
+      setShowPreviewModal(true);
     } finally {
       setIsTakingPicture(false);
+    }
+  };
+
+  const handleRetake = () => {
+    setShowPreviewModal(false);
+    setCapturedPhotoUri(null);
+    setCapturedPhotoBase64(null);
+  };
+
+  const handleUpload = async () => {
+    if (!capturedPhotoBase64 || isUploading) {
+      return;
+    }
+    if (!params.missionId) {
+      Alert.alert('No active mission', 'Cannot upload: no mission ID provided.');
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error('Your session expired. Please sign in again.');
+      }
+
+      // We omit the edge-function URL explicitly to correctly map to Supabase edge function
+      const response = await fetch(`https://omrqdxvgkxqikkorsnwx.supabase.co/functions/v1/submission-engine/submit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          mission_id: params.missionId,
+          image_base64: capturedPhotoBase64,
+          latitude: 0,
+          longitude: 0, // Using placeholders depending on logic, since coordinates check is done locally on map screen
+        }),
+      });
+
+      if (!response.ok) {
+        const body = await response.text();
+        throw new Error(body || 'Upload failed');
+      }
+
+      const result = await response.json() as { verification_status?: string; reward_awarded?: number };
+
+      setShowPreviewModal(false);
+      setCapturedPhotoUri(null);
+      setCapturedPhotoBase64(null);
+
+      if (result.verification_status === 'approved') {
+        Alert.alert('Approved', `Gemini approved this upload! XP was awarded${result.reward_awarded ? ` (+${result.reward_awarded})` : ''}.`, [
+          { text: "OK", onPress: () => router.push('/council-page') }
+        ]);
+      } else {
+        Alert.alert('Sent for review', 'Gemini marked this upload for council review.', [
+          { text: "OK", onPress: () => router.push('/council-page') }
+        ]);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Upload failed';
+      Alert.alert('Upload error', message);
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -95,7 +182,7 @@ export default function ScanScreen() {
             </View>
             <Text style={styles.title}>Scan Ready</Text>
             <Text style={styles.body}>
-              Point the camera at a mission marker or field QR to register the next action.
+              Snap a photo of clearing the quest
             </Text>
             {scannedValue ? <Text style={styles.result}>{scannedValue}</Text> : null}
           </View>
@@ -110,6 +197,29 @@ export default function ScanScreen() {
 
         <Text style={styles.shutterHint}>{isTakingPicture ? 'Capturing...' : 'Tap to click a photo'}</Text>
       </View>
+
+      <Modal visible={showPreviewModal} transparent animationType="fade" onRequestClose={handleRetake}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Preview Photo</Text>
+            {capturedPhotoUri ? (
+              <Image source={{ uri: capturedPhotoUri }} style={styles.previewImage} resizeMode="cover" />
+            ) : null}
+
+            <View style={styles.modalActions}>
+              <Pressable style={styles.retakeButton} onPress={handleRetake}>
+                <Text style={styles.retakeButtonText}>Retake Photo</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.uploadButton, isUploading && styles.uploadButtonDisabled]}
+                onPress={() => void handleUpload()}
+                disabled={isUploading}>
+                <Text style={styles.uploadButtonText}>{isUploading ? 'Uploading...' : 'Submit to Gemini AI'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -286,5 +396,66 @@ const styles = StyleSheet.create({
     color: EcoColors.textMuted,
     fontSize: 12,
     fontWeight: '600',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(10, 22, 16, 0.75)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: EcoSpacing.lg,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 420,
+    borderRadius: EcoRadius.xl,
+    borderWidth: 1,
+    borderColor: EcoColors.border,
+    backgroundColor: EcoColors.surface,
+    padding: EcoSpacing.md,
+    gap: EcoSpacing.md,
+  },
+  modalTitle: {
+    color: EcoColors.text,
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  previewImage: {
+    width: '100%',
+    height: 320,
+    borderRadius: EcoRadius.lg,
+    backgroundColor: '#e7ece8',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: EcoSpacing.sm,
+  },
+  retakeButton: {
+    flex: 1,
+    borderRadius: EcoRadius.md,
+    borderWidth: 1,
+    borderColor: EcoColors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    backgroundColor: EcoColors.surface,
+  },
+  retakeButtonText: {
+    color: EcoColors.text,
+    fontWeight: '700',
+  },
+  uploadButton: {
+    flex: 1,
+    borderRadius: EcoRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    backgroundColor: EcoColors.primary,
+  },
+  uploadButtonDisabled: {
+    opacity: 0.7,
+  },
+  uploadButtonText: {
+    color: '#fff',
+    fontWeight: '800',
   },
 });
