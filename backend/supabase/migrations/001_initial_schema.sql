@@ -167,3 +167,34 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE OR REPLACE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- --- Storage Configuration ---
+-- Create the submissions bucket if it doesn't exist
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('submissions', 'submissions', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+-- Setup Storage RLS Policies
+CREATE POLICY "Avatar images are publicly accessible."
+  ON storage.objects FOR SELECT
+  USING (bucket_id = 'submissions');
+
+CREATE POLICY "Anyone can upload an avatar."
+  ON storage.objects FOR INSERT
+  WITH CHECK (bucket_id = 'submissions');
+  
+CREATE POLICY "Anyone can update their own avatar."
+  ON storage.objects FOR UPDATE
+  WITH CHECK (bucket_id = 'submissions');
+
+-- Enable Realtime
+begin;
+  -- remove the supabase_realtime publication
+  DROP PUBLICATION IF EXISTS supabase_realtime;
+  -- re-create the supabase_realtime publication with no tables
+  CREATE PUBLICATION supabase_realtime;
+commit;
+
+-- add tables to the publication
+ALTER PUBLICATION supabase_realtime ADD TABLE public.mission_submissions;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.votes;
