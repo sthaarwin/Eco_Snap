@@ -119,7 +119,6 @@ export default function MissionBriefScreen() {
             setUserStats(profileData);
             userProfileData = profileData;
           }
-          }
         }
         // Fetch active missions from supabase
         const { data, error } = await supabase

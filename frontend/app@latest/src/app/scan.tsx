@@ -43,7 +43,7 @@ export default function ScanScreen() {
 
     try {
       const photo = await cameraRef.current.takePictureAsync({
-        quality: 0.35,
+        quality: 0.8,
         base64: true,
         skipProcessing: true,
       });
@@ -103,18 +103,29 @@ export default function ScanScreen() {
         throw new Error(body || 'Upload failed');
       }
 
-      const result = await response.json() as { verification_status?: string; reward_awarded?: number };
+      const result = await response.json() as { verification_status?: string; reward_awarded?: number; ai_reasoning?: string };
+
+      console.log('━━━ GEMINI RESPONSE LOG ━━━')
+      console.log(`Status: ${result.verification_status}`);
+      console.log(`Reasoning: ${result.ai_reasoning}`);
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━')
 
       setShowPreviewModal(false);
       setCapturedPhotoUri(null);
       setCapturedPhotoBase64(null);
 
       if (result.verification_status === 'approved') {
-        Alert.alert('Approved', `Gemini approved this upload! XP was awarded${result.reward_awarded ? ` (+${result.reward_awarded})` : ''}.`, [
+        Alert.alert('✅ Approved', `Gemini verified your submission!${result.reward_awarded ? ` +${result.reward_awarded} XP awarded.` : ''}`, [
           { text: "OK", onPress: () => router.push('/council-page') }
         ]);
+      } else if (result.verification_status === 'rejected') {
+        const reason = result.ai_reasoning || 'The image was too blurry, too dark, or could not be understood.';
+        Alert.alert('❌ Submission Rejected', `Gemini rejected this photo.\n\nReason: ${reason}\n\nPlease retake the photo clearly.`, [
+          { text: "Retake", style: 'cancel', onPress: handleRetake },
+          { text: "Cancel", onPress: () => router.push('/live-map-page') }
+        ]);
       } else {
-        Alert.alert('Sent for review', 'Gemini marked this upload for council review.', [
+        Alert.alert('🔍 Sent for Council Review', `Gemini was unsure about this submission and escalated it for human review.\n\n${result.ai_reasoning ? `AI note: ${result.ai_reasoning}` : ''}`, [
           { text: "OK", onPress: () => router.push('/council-page') }
         ]);
       }

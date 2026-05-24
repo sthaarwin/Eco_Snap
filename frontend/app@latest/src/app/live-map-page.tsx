@@ -79,26 +79,6 @@ export default function LiveMapPageScreen() {
 
   const isTracking = globalActiveMissionId !== null;
   const targetId = globalActiveMissionId;
-
-// Module-level persistent state so active quest survives tab switching
-let globalActiveMissionId: string | null = null;
-
-export default function LiveMapPageScreen() {
-  const router = useRouter();
-  const params = useLocalSearchParams<{ tracking?: string, missionId?: string, clearTracking?: string }>();
-
-  // Intercept incoming tracking commands to update global state
-  if (params.tracking === 'true' && params.missionId && typeof params.missionId === 'string') {
-    globalActiveMissionId = params.missionId;
-  }
-
-  // If the user deliberately clears tracking from somewhere else, support it
-  if (params.clearTracking === 'true') {
-    globalActiveMissionId = null;
-  }
-
-  const isTracking = globalActiveMissionId !== null;
-  const targetId = globalActiveMissionId;
   const [missions, setMissions] = useState<Mission[]>([]);
   const [currentLocation, setCurrentLocation] = useState<CurrentLocation | null>(null);
   const [mapRegion, setMapRegion] = useState(DEFAULT_REGION);
@@ -225,8 +205,11 @@ export default function LiveMapPageScreen() {
 
       setCurrentLocation(nextLocation);
 
-      // Do not re-center the map automatically every pixel, allows user to freely pan
-      // while the internal engine still computes radii logic accurately.
+      setMapRegion((region) => ({
+        ...region,
+        latitude: nextLocation.latitude,
+        longitude: nextLocation.longitude,
+      }));
 
       setLocationStatus(
         nextLocation.accuracy
@@ -382,8 +365,15 @@ export default function LiveMapPageScreen() {
               showsUserLocation={true}
               showsMyLocationButton={true}
             >
-              {currentLocation ? (
+              {isTracking && pathCoordinates.length > 1 && (
+                <Polyline
+                  coordinates={pathCoordinates}
+                  strokeColor="#ef4444"
+                  strokeWidth={4}
+                />
+              )}
 
+              {currentLocation ? (
                 <Marker
                   coordinate={{
                     latitude: currentLocation.latitude,
@@ -521,16 +511,13 @@ export default function LiveMapPageScreen() {
 
         {activeTargetMission ? (
           <Pressable
-            style={[styles.primaryButton, !canClearQuest && { backgroundColor: '#9ca3af' }]}
-            disabled={!canClearQuest}
+            style={styles.primaryButton}
             onPress={() => {
-              if (canClearQuest) {
-                router.push(`/scan?missionId=${activeTargetMission.id}`);
-              }
+              router.push(`/scan?missionId=${activeTargetMission.id}`);
             }}
           >
             <Text style={styles.primaryText}>
-              {canClearQuest ? 'Scan to Verify Quest' : 'Move Closer To Verify Quest'}
+              {canClearQuest ? 'Scan to Verify Quest ✅' : 'Scan to Verify Quest'}
             </Text>
           </Pressable>
         ) : (
