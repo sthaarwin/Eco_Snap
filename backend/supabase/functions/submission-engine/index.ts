@@ -55,16 +55,48 @@ serve(async (req) => {
 
       if (dbError) throw dbError
 
-      // Auto-trigger AI verification via User 3's ai-engine (fire-and-forget)
+      // Trigger AI verification via Gemini and wait for the result so the client can show the final status.
       const aiEngineUrl = `${Deno.env.get('SUPABASE_URL')!}/functions/v1/ai-engine/verify-image`
-      fetch(aiEngineUrl, {
+      const aiResponse = await fetch(aiEngineUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ submission_id: submission.id }),
-      }).catch((err) => console.error('ai-engine trigger failed:', err))
+      }).catch((err) => {
+        console.error('ai-engine trigger failed:', err)
+        return null
+      })
+
+      let verification_status: SubmissionResponse['verification_status'] = 'pending'
+      let auto_approved = false
+      let reward_awarded = 0
+
+      if (aiResponse?.ok) {
+        const aiResult = await aiResponse.json() as {
+          auto_approved?: boolean
+          reward_awarded?: number
+          verdict?: SubmissionResponse['verification_status']
+        }
+
+        auto_approved = Boolean(aiResult.auto_approved)
+        reward_awarded = aiResult.reward_awarded ?? 0
+        verification_status = aiResult.verdict === 'approved' || aiResult.verdict === 'needs_review'
+          ? aiResult.verdict
+          : (auto_approved ? 'approved' : 'needs_review')
+      }
+
+      const { data: finalizedSubmission } = await supabase
+        .from('mission_submissions')
+        .select('*')
+        .eq('id', submission.id)
+        .single()
 
       return new Response(
-        JSON.stringify(submission as SubmissionResponse),
+        JSON.stringify({
+          ...(finalizedSubmission ?? submission),
+          verification_status: finalizedSubmission?.verification_status ?? verification_status,
+          auto_approved,
+          reward_awarded,
+        } satisfies SubmissionResponse & { auto_approved: boolean; reward_awarded: number }),
         { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -148,8 +180,9 @@ serve(async (req) => {
     )
   } catch (err) {
     console.error('submission-engine error:', err)
+    const details = err instanceof Error ? err.message : String(err)
     return new Response(
-      JSON.stringify({ error: 'Internal server error', code: 'INTERNAL_ERROR', details: err.message } satisfies ApiError),
+      JSON.stringify({ error: 'Internal server error', code: 'INTERNAL_ERROR', details } satisfies ApiError),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }

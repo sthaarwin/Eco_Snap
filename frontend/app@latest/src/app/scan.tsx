@@ -1,13 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { Platform, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Modal, Platform, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 
 import { EcoColors, EcoRadius, EcoSpacing } from '@/constants/ecosnap-theme';
+import { SUPABASE_URL, supabase } from '@/lib/supabase';
 
 export default function ScanScreen() {
   const cameraRef = useRef<CameraView | null>(null);
   const [permission, requestPermission] = useCameraPermissions();
   const [isTakingPicture, setIsTakingPicture] = useState(false);
+  const [capturedPhotoUri, setCapturedPhotoUri] = useState<string | null>(null);
+  const [capturedPhotoBase64, setCapturedPhotoBase64] = useState<string | null>(null);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
     if (!permission) {
@@ -23,9 +28,91 @@ export default function ScanScreen() {
     setIsTakingPicture(true);
 
     try {
-      await cameraRef.current.takePictureAsync({ quality: 0.7, skipProcessing: true });
+      const photo = await cameraRef.current.takePictureAsync({
+        quality: 0.35,
+        base64: true,
+        skipProcessing: true,
+      });
+      setCapturedPhotoUri(photo?.uri ?? null);
+      setCapturedPhotoBase64(photo?.base64 ? `data:image/jpeg;base64,${photo.base64}` : null);
+      setShowPreviewModal(true);
     } finally {
       setIsTakingPicture(false);
+    }
+  };
+
+  const resolveActiveMissionId = async () => {
+    const { data, error } = await supabase
+      .from('missions')
+      .select('id')
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data?.id ?? null;
+  };
+
+  const handleRetake = () => {
+    setShowPreviewModal(false);
+    setCapturedPhotoUri(null);
+    setCapturedPhotoBase64(null);
+  };
+
+  const handleUpload = async () => {
+    if (!capturedPhotoBase64 || isUploading) {
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const missionId = await resolveActiveMissionId();
+      if (!missionId) {
+        Alert.alert('No active mission', 'There is no active mission available to attach this upload.');
+        return;
+      }
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error('Your session expired. Please sign in again.');
+      }
+
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/submission-engine/submit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          mission_id: missionId,
+          image_base64: capturedPhotoBase64,
+          latitude: 0,
+          longitude: 0,
+        }),
+      });
+
+      if (!response.ok) {
+        const body = await response.text();
+        throw new Error(body || 'Upload failed');
+      }
+
+      const result = await response.json() as { verification_status?: string; reward_awarded?: number };
+
+      setShowPreviewModal(false);
+      setCapturedPhotoUri(null);
+      setCapturedPhotoBase64(null);
+
+      if (result.verification_status === 'approved') {
+        Alert.alert('Approved', `Gemini approved this upload. XP was awarded${result.reward_awarded ? ` (+${result.reward_awarded})` : ''}.`);
+      } else {
+        Alert.alert('Sent for review', 'Gemini marked this upload for council review.');
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Upload failed';
+      Alert.alert('Upload error', message);
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -94,6 +181,27 @@ export default function ScanScreen() {
 
         <Text style={styles.shutterHint}>{isTakingPicture ? 'Capturing...' : 'Tap to click a photo'}</Text>
       </View>
+
+      <Modal visible={showPreviewModal} transparent animationType="fade" onRequestClose={handleRetake}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Preview Photo</Text>
+            {capturedPhotoUri ? <Image source={{ uri: capturedPhotoUri }} style={styles.previewImage} /> : null}
+
+            <View style={styles.modalActions}>
+              <Pressable style={styles.retakeButton} onPress={handleRetake}>
+                <Text style={styles.retakeButtonText}>Retake Photo</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.uploadButton, isUploading && styles.uploadButtonDisabled]}
+                onPress={() => void handleUpload()}
+                disabled={isUploading}>
+                <Text style={styles.uploadButtonText}>{isUploading ? 'Uploading...' : 'Upload'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -260,5 +368,66 @@ const styles = StyleSheet.create({
     color: EcoColors.textMuted,
     fontSize: 12,
     fontWeight: '600',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(10, 22, 16, 0.75)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: EcoSpacing.lg,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 420,
+    borderRadius: EcoRadius.xl,
+    borderWidth: 1,
+    borderColor: EcoColors.border,
+    backgroundColor: EcoColors.surface,
+    padding: EcoSpacing.md,
+    gap: EcoSpacing.md,
+  },
+  modalTitle: {
+    color: EcoColors.text,
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  previewImage: {
+    width: '100%',
+    height: 320,
+    borderRadius: EcoRadius.lg,
+    backgroundColor: '#e7ece8',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: EcoSpacing.sm,
+  },
+  retakeButton: {
+    flex: 1,
+    borderRadius: EcoRadius.md,
+    borderWidth: 1,
+    borderColor: EcoColors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    backgroundColor: EcoColors.surface,
+  },
+  retakeButtonText: {
+    color: EcoColors.text,
+    fontWeight: '700',
+  },
+  uploadButton: {
+    flex: 1,
+    borderRadius: EcoRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    backgroundColor: EcoColors.primary,
+  },
+  uploadButtonDisabled: {
+    opacity: 0.7,
+  },
+  uploadButtonText: {
+    color: '#fff',
+    fontWeight: '800',
   },
 });

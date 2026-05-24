@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import * as SecureStore from 'expo-secure-store';
 
-const supabaseUrl = 'https://omrqdxvgkxqikkorsnwx.supabase.co';
-const supabaseAnonKey = 'sb_publishable_OlDs3YwmCSny0vNv8-R7hA_inkrofrH';
+export const SUPABASE_URL = 'https://omrqdxvgkxqikkorsnwx.supabase.co';
+export const SUPABASE_ANON_KEY = 'sb_publishable_OlDs3YwmCSny0vNv8-R7hA_inkrofrH';
 
 // Custom storage wrapper for Expo SecureStore to match Supabase's storage interface
 const secureStore = {
@@ -17,7 +17,7 @@ const secureStore = {
   },
 };
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     storage: secureStore,
     autoRefreshToken: true,

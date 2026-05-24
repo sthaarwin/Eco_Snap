@@ -3,6 +3,7 @@ import { useRef, useState } from 'react';
 import {
   Animated,
   Image,
+  Modal,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -100,6 +101,7 @@ function ActionButton({
 
 export default function CouncilPageScreen() {
   const [items, setItems] = useState(initialItems);
+  const [zoomImage, setZoomImage] = useState<string | null>(null);
   const [votes, setVotes] = useState<Record<string, VoteState>>(() => {
     const initialVotes: Record<string, VoteState> = {};
     initialItems.forEach((item) => {
@@ -176,7 +178,16 @@ export default function CouncilPageScreen() {
 
           return (
             <View style={styles.card} key={item.id}>
-              <Image source={{ uri: item.image }} style={styles.image} />
+              <View style={styles.imageWrap}>
+                <Image source={{ uri: item.image }} style={styles.image} />
+                <Pressable
+                  style={styles.zoomButton}
+                  accessibilityRole="button"
+                  accessibilityLabel="Zoom image"
+                  onPress={() => setZoomImage(item.image)}>
+                  <Ionicons name="expand" size={18} color="#fff" />
+                </Pressable>
+              </View>
               <View style={styles.cardBody}>
                 <View style={styles.cardHeaderRow}>
                   <View style={{ flex: 1 }}>
@@ -223,6 +234,16 @@ export default function CouncilPageScreen() {
           );
         })}
       </ScrollView>
+
+      <Modal visible={!!zoomImage} transparent animationType="fade" onRequestClose={() => setZoomImage(null)}>
+        <View style={styles.zoomBackdrop}>
+          <Pressable style={styles.zoomClose} onPress={() => setZoomImage(null)} accessibilityRole="button">
+            <Ionicons name="close" size={24} color="#fff" />
+          </Pressable>
+
+          {zoomImage ? <Image source={{ uri: zoomImage }} style={styles.zoomImage} resizeMode="contain" /> : null}
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -278,9 +299,25 @@ const styles = StyleSheet.create({
     borderColor: EcoColors.border,
     overflow: 'hidden',
   },
+  imageWrap: {
+    position: 'relative',
+  },
   image: {
     width: '100%',
     height: 190,
+  },
+  zoomButton: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(10, 22, 16, 0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.28)',
   },
   cardBody: {
     padding: EcoSpacing.md,
@@ -379,5 +416,28 @@ const styles = StyleSheet.create({
   completeText: {
     color: EcoColors.text,
     fontWeight: '600',
+  },
+  zoomBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: EcoSpacing.md,
+  },
+  zoomImage: {
+    width: '100%',
+    height: '85%',
+  },
+  zoomClose: {
+    position: 'absolute',
+    top: 48,
+    right: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.14)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
   },
 });

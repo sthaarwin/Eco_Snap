@@ -30,6 +30,8 @@ export interface SubmissionResponse {
   confidence_score: number | null;
   verification_status: 'pending' | 'approved' | 'rejected' | 'needs_review';
   created_at: string;
+  auto_approved?: boolean;
+  reward_awarded?: number;
 }
 
 export interface VerificationResult {
