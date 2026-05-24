@@ -1,7 +1,7 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useColorScheme } from 'react-native';
 import { useEffect } from 'react';
-import { useRouter, useSegments } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import AppTabs from '@/components/app-tabs';
@@ -25,10 +25,16 @@ function RootLayoutNav() {
     }
   }, [user, isLoading, segments]);
 
+  const isAuthRoute = segments[0] === 'index' || segments[0] === 'signup';
+
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <AnimatedSplashOverlay />
-      <AppTabs />
+      {isAuthRoute ? (
+        <Stack screenOptions={{ headerShown: false }} />
+      ) : (
+        <AppTabs />
+      )}
     </ThemeProvider>
   );
 }
