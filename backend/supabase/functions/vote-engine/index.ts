@@ -2,7 +2,7 @@ import { serve } from 'https://deno.land/std@0.210.0/http/server.ts'
 import { corsHeaders, createUserClient, requireUser, supabaseAdmin } from '../_shared/supabase.ts'
 import { VoteRequest, VoteResponse, ApiError } from '../_shared/contracts.ts'
 
-const VOTE_THRESHOLD = 3
+const VOTE_THRESHOLD = 5
 const APPROVAL_RATIO = 0.6
 
 serve(async (req) => {

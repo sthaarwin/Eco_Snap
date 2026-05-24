@@ -1,18 +1,22 @@
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'expo-router';
-import { Image, Pressable, SafeAreaView, FlatList, StyleSheet, Text, View, ActivityIndicator, Dimensions } from 'react-native';
+import { Image, Pressable, FlatList, StyleSheet, Text, View, ActivityIndicator, Dimensions, Modal, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 
 import { EcoColors, EcoRadius, EcoSpacing } from '@/constants/ecosnap-theme';
 import { supabase } from '@/lib/supabase';
+import { kMeans, Point } from '@/lib/clustering';
 
-type Hotspot = {
+type Mission = {
   id: string;
+  title: string;
+  narrative: string;
   coordinates: { lat: number; lng: number };
-  status: 'active' | 'resolved';
-  severity: number;
-  category: string;
-  mission_id: string | null;
+  priority: number;
+  status: 'active' | 'in_progress' | 'completed' | 'expired';
+  weather_trigger: string | null;
+  location_name: string | null;
   created_at: string;
 };
 
@@ -31,14 +35,48 @@ function getDistanceFromLatLonInKm(lat1: number, lon1: number, lat2: number, lon
   return d;
 }
 
+// Pseudo-random generator for consistent nearby coordinates
+function seededRandom(seed: string) {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = Math.imul(31, h) + seed.charCodeAt(i) | 0;
+  return () => {
+    h = Math.imul(1597334677, h);
+    return ((h >>> 0) / 4294967296);
+  };
+}
+
+const RELATABLE_IMAGES = [
+  'https://images.unsplash.com/photo-1611284446314-60a58ac0deb9', // trash shoreline
+  'https://images.unsplash.com/photo-1532996122724-e3c354a0b15b', // plastic bottles coast
+  'https://images.unsplash.com/photo-1528323273322-d81458248d40', // plastic pollution
+  'https://images.unsplash.com/photo-1618477461853-cf6ed80fbfc5', // garbage bags
+  'https://images.unsplash.com/photo-1605600659908-0ef719419d41', // litter road
+  'https://images.unsplash.com/photo-1595278149814-72236d65f583', // landfill
+  'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09', // environment cleanup
+  'https://images.unsplash.com/photo-1621451537084-482c73073e0f', // trash ocean
+];
+function getRelatableImage(seed: string) {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = Math.imul(31, h) + seed.charCodeAt(i) | 0;
+  const index = Math.abs(h) % RELATABLE_IMAGES.length;
+  return `${RELATABLE_IMAGES[index]}?w=1400&h=220&fit=crop`;
+}
+
 const { width } = Dimensions.get('window');
+
+const narrativeCache: Record<string, string> = {};
 
 export default function MissionBriefScreen() {
   const router = useRouter();
-  const [missions, setMissions] = useState<(Hotspot & { distance?: number })[]>([]);
+  const [missions, setMissions] = useState<(Mission & { distance?: number })[]>([]);
   const [loading, setLoading] = useState(true);
   const [locationName, setLocationName] = useState('your area');
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [userStats, setUserStats] = useState<{ level: number, xp: number } | null>(null);
+
+  const [showDetails, setShowDetails] = useState(false);
+  const [aiNarrative, setAiNarrative] = useState<string | null>(null);
+  const [isImprovising, setIsImprovising] = useState(false);
 
   useEffect(() => {
     const fetchMissions = async () => {
@@ -67,19 +105,83 @@ export default function MissionBriefScreen() {
           }
         }
 
-        // Fetch active hotspots from supabase
+        let userProfileData = null;
+        // Fetch user stats
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session && session.user) {
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('xp, level')
+            .eq('id', session.user.id)
+            .single();
+          if (profileData) {
+            setUserStats(profileData);
+            userProfileData = profileData;
+          }
+        }
+
+        // Fetch active missions from supabase
         const { data, error } = await supabase
-          .from('hotspots')
+          .from('missions')
           .select('*')
           .eq('status', 'active');
 
         if (!error && data) {
-          const hotspotsWithDistance = (data as Hotspot[]).map(h => ({
-            ...h,
-            distance: getDistanceFromLatLonInKm(userLat, userLng, h.coordinates.lat, h.coordinates.lng)
-          })).sort((a, b) => (a.distance || 0) - (b.distance || 0));
+          const missionsWithDistance = (data as Mission[]).map((m: any) => {
+            const rand = seededRandom(m.id);
+            const latOffset = (rand() - 0.5) * 0.01;
+            const lngOffset = (rand() - 0.5) * 0.01;
 
-          setMissions(hotspotsWithDistance);
+            const updatedCoords = {
+              lat: userLat + latOffset,
+              lng: userLng + lngOffset
+            };
+
+            return {
+              ...m,
+              coordinates: updatedCoords,
+              distance: getDistanceFromLatLonInKm(userLat, userLng, updatedCoords.lat, updatedCoords.lng)
+            };
+          });
+
+          // K-Means clustering architecture mapping
+          if (missionsWithDistance.length > 3) {
+            const maxDistance = Math.max(...missionsWithDistance.map(m => m.distance || 0.1));
+
+            const points: Point[] = missionsWithDistance.map(m => ({
+              id: m.id,
+              features: [(m.distance || 0) / maxDistance, m.priority / 5],
+              originalData: m
+            }));
+
+            // Generate 3 behavioral clusters
+            const clusters = kMeans(points, 3);
+            const userLevelNorm = (userProfileData?.level || 1) / 5;
+
+            // Score clusters: prefer low distance, and priority matching user level
+            const scoredClusters = clusters.map(cluster => {
+              const meanDist = cluster.reduce((sum, p) => sum + p.features[0], 0) / cluster.length;
+              const meanPri = cluster.reduce((sum, p) => sum + p.features[1], 0) / cluster.length;
+              const score = meanDist * 0.6 + Math.abs(meanPri - userLevelNorm) * 0.4;
+              return { cluster, score };
+            });
+
+            // Sort clusters by best score
+            scoredClusters.sort((a, b) => a.score - b.score);
+
+            // Recombine missions based on best clustered priorities
+            const sortedMissions: (Mission & { distance?: number })[] = [];
+            for (const sc of scoredClusters) {
+              const sortedInCluster = sc.cluster
+                .map(p => p.originalData)
+                .sort((a, b) => (a.distance || 0) - (b.distance || 0));
+              sortedMissions.push(...sortedInCluster);
+            }
+            setMissions(sortedMissions.slice(0, 5));
+          } else {
+            missionsWithDistance.sort((a, b) => (a.distance || 0) - (b.distance || 0));
+            setMissions(missionsWithDistance.slice(0, 5));
+          }
         }
       } catch (err) {
         console.error(err);
@@ -98,8 +200,49 @@ export default function MissionBriefScreen() {
     }
   };
 
+  const handleImprovise = async () => {
+    const selectedMission = missions[currentIndex];
+    if (!selectedMission) return;
+
+    if (narrativeCache[selectedMission.id]) {
+      setAiNarrative(narrativeCache[selectedMission.id]);
+      return;
+    }
+
+    setIsImprovising(true);
+    try {
+      const res = await fetch('https://omrqdxvgkxqikkorsnwx.supabase.co/functions/v1/ai-engine/generate-narrative', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          temperature: 25, condition: 'severe', wind_speed: 15, humidity: 65,
+          location_name: locationName || 'Local Sector',
+          lat: selectedMission.coordinates.lat, lng: selectedMission.coordinates.lng
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const text = data.narrative ? `✨ ${data.narrative}` : `✨ Sensors detect hazardous readings requiring immediate attention.`;
+        narrativeCache[selectedMission.id] = text;
+        setAiNarrative(text);
+      } else {
+        const fallback = `✨ (Gemini Bypass): AI verification requested. Environmental discrepancy flagged at ${locationName}.`;
+        narrativeCache[selectedMission.id] = fallback;
+        setAiNarrative(fallback);
+      }
+    } catch {
+      const fallback = `✨ (Gemini Bypass): AI verification requested. Environmental discrepancy flagged at ${locationName}.`;
+      narrativeCache[selectedMission.id] = fallback;
+      setAiNarrative(fallback);
+    } finally {
+      setIsImprovising(false);
+    }
+  };
+
   const handleViewDetails = () => {
-    router.push('/council-page');
+    setAiNarrative(null);
+    setShowDetails(true);
+    handleImprovise();
   };
 
   return (
@@ -107,7 +250,10 @@ export default function MissionBriefScreen() {
       <View style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.pageTitle}>Local Missions</Text>
-          <Text style={styles.subtitle}>Showing adaptive missions for {locationName}</Text>
+          <Text style={styles.subtitle}>
+            Showing adaptive missions for {locationName}
+            {userStats ? ` • Scout Level ${userStats.level}` : ''}
+          </Text>
         </View>
 
         {loading ? (
@@ -133,43 +279,49 @@ export default function MissionBriefScreen() {
                 <View style={{ width, paddingHorizontal: EcoSpacing.lg }}>
                   <View style={styles.card}>
                     <View style={styles.badgeRow}>
-                      <Text style={[styles.badge, styles.activeBadge]}>ACTIVE MISSION</Text>
-                      <Text style={[styles.badge, styles.priorityBadge, mission.severity >= 4 && styles.urgentBadge]}>
-                        PRIORITY {mission.severity}
+                      <Text style={[styles.badge, styles.activeBadge]}>AVAILABLE QUEST</Text>
+                      <Text style={[styles.badge, styles.priorityBadge, mission.priority >= 4 && styles.urgentBadge]}>
+                        PRIORITY {mission.priority}
                       </Text>
+                      {userStats && mission.priority > userStats.level && (
+                        <Text style={[styles.badge, styles.priorityBadge, { backgroundColor: '#f1f5f9', color: '#64748b' }]}>
+                          CHALLENGING
+                        </Text>
+                      )}
                     </View>
 
                     <Text style={styles.missionCardTitle}>
-                      {mission.category ? mission.category.replace(/_/g, ' ').toUpperCase() : `Mission #${index + 1}`}
+                      {mission.title ? mission.title : `Mission #${index + 1}`}
                     </Text>
 
                     <View style={styles.heroCard}>
                       <Image
                         source={{
-                          uri: 'https://images.unsplash.com/photo-1618477460939-5a6769c15f75?auto=format&fit=crop&w=1400&q=80',
+                          uri: getRelatableImage(mission.id),
                         }}
                         style={styles.heroImage}
                       />
                       <View style={styles.overlayLabel}>
                         <Text style={styles.overlayLabelText}>
-                          {mission.distance !== undefined ? `${mission.distance.toFixed(1)} km away` : 'Nearby'}
+                          {mission.distance !== undefined
+                            ? (mission.distance < 1 ? `${Math.round(mission.distance * 1000)} m away` : `${mission.distance.toFixed(1)} km away`)
+                            : 'Nearby'}
                         </Text>
                       </View>
                     </View>
 
                     <Text style={styles.sectionTitle}>Intelligence Report</Text>
                     <Text style={styles.body}>
-                      Sensor networks and scout reports indicate a severity {mission.severity} issue at this location.
-                      Objective: document pollutant categories, mitigate the issue if possible, and submit a verified report to earn rewards.
+                      {mission.narrative ? mission.narrative : `Sensor networks and scout reports indicate a priority ${mission.priority} issue at this location. Objective: document pollutant categories, mitigate the issue if possible, and submit a verified report to earn rewards.`}
                     </Text>
 
                     <View style={styles.metricsRow}>
                       <View style={styles.metricBox}>
-                        <Text style={styles.metricValue}>{Math.round(mission.severity * 100 + 50)}</Text>
+                        <Text style={styles.metricValue}>{Math.round(mission.priority * 100 + 50)}</Text>
                         <Text style={styles.metricLabel}>XP</Text>
                       </View>
                       <View style={styles.metricBox}>
-                        <Text style={[styles.metricValue, { color: EcoColors.sky }]}>{mission.severity * 5}</Text>
+                        <Text style={[styles.metricValue, { color: EcoColors.sky }]}>{mission.priority * 5}</Text>
                         <Text style={styles.metricLabel}>Impact</Text>
                       </View>
                     </View>
@@ -194,6 +346,50 @@ export default function MissionBriefScreen() {
             </View>
           </>
         )}
+
+        {/* Full Screen Details Modal */}
+        <Modal visible={showDetails} animationType="slide" transparent={true}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              {missions[currentIndex] && (
+                <>
+                  <Text style={styles.modalTitle}>{missions[currentIndex].title}</Text>
+                  <Text style={styles.urgencyBadgeModal}>Priority Level: {missions[currentIndex].priority}</Text>
+
+                  <ScrollView style={{ maxHeight: '50%', marginVertical: EcoSpacing.md }}>
+                    <Text style={styles.modalSectionTitle}>Detailed Intelligence Report</Text>
+                    {isImprovising ? (
+                      <Text style={[styles.modalBody, { fontStyle: 'italic' }]}>✨ Gemini is analyzing the anomaly...</Text>
+                    ) : (
+                      <Text style={styles.modalBody}>
+                        {aiNarrative || missions[currentIndex].narrative || 'Detailed documentation pending. Assess on-site.'}
+                      </Text>
+                    )}
+
+                    <Text style={[styles.modalSectionTitle, { marginTop: EcoSpacing.md, color: EcoColors.primary }]}>
+                      Verification Objective
+                    </Text>
+                    <Text style={styles.modalBody}>
+                      1. Navigate to the marked 500-meter radius location.
+                      2. Clean up or neutralize the identified environmental hazard.
+                      3. Use the app to snap verifiable photographic evidence of the resolved zone.
+                    </Text>
+                  </ScrollView>
+
+                  <Pressable style={[styles.primaryButton, { marginTop: EcoSpacing.sm }]} onPress={() => {
+                    setShowDetails(false);
+                    handleStartMission();
+                  }}>
+                    <Text style={styles.primaryText}>Start Quest Now</Text>
+                  </Pressable>
+                  <Pressable style={{ padding: 16, alignItems: 'center' }} onPress={() => setShowDetails(false)}>
+                    <Text style={{ color: EcoColors.textMuted, fontWeight: '700' }}>Close Details</Text>
+                  </Pressable>
+                </>
+              )}
+            </View>
+          </View>
+        </Modal>
       </View>
     </SafeAreaView>
   );
@@ -369,5 +565,69 @@ const styles = StyleSheet.create({
   secondaryText: {
     color: EcoColors.text,
     fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  modalContent: {
+    backgroundColor: EcoColors.surface,
+    borderTopLeftRadius: EcoRadius.xl,
+    borderTopRightRadius: EcoRadius.xl,
+    padding: EcoSpacing.xl,
+    paddingBottom: 48,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: EcoColors.text,
+    marginBottom: EcoSpacing.xs,
+  },
+  urgencyBadgeModal: {
+    backgroundColor: '#fff6e8',
+    color: EcoColors.warning,
+    fontWeight: '700',
+    fontSize: 12,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  modalSectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: EcoColors.text,
+    marginTop: EcoSpacing.sm,
+    marginBottom: EcoSpacing.xs,
+  },
+  modalBody: {
+    fontSize: 15,
+    color: EcoColors.textMuted,
+    lineHeight: 22,
+  },
+  actionRowModal: {
+    flexDirection: 'row',
+    marginTop: EcoSpacing.sm,
+  },
+  secondaryBtnModal: {
+    flex: 1,
+    backgroundColor: '#f1f5f9',
+    borderColor: '#e2e8f0',
+    borderWidth: 1,
+    borderRadius: EcoRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+  },
+  secondaryBtnTextModal: {
+    color: '#334155',
+    fontWeight: '700',
+    fontSize: 15,
   },
 });
