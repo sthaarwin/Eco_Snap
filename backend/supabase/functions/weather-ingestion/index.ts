@@ -12,7 +12,7 @@ serve(async (req) => {
 
   const url = new URL(req.url)
   const method = req.method
-  const path = url.pathname.replace('/functions/v1/weather-ingestion', '')
+  const path = url.pathname.replace('/weather-ingestion', '')
 
   try {
     if (method === 'POST' && path === '/weather') {
