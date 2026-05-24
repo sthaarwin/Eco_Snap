@@ -9,15 +9,42 @@ import {
   Text,
   TextInput,
   View,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 
 import { EcoColors, EcoRadius, EcoSpacing } from '@/constants/ecosnap-theme';
+import { supabase } from '@/lib/supabase';
 
 export default function LoginScreen() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+
+  async function handleLogin() {
+    if (!email || !password) {
+      Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+
+      router.replace('/live-map-page');
+    } catch (error: any) {
+      Alert.alert('Login Error', error.message || 'An unexpected error occurred');
+    } finally {
+      setIsLoading(false);
+    }
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -66,8 +93,16 @@ export default function LoginScreen() {
             <Text style={styles.linkInline}>Forgot Password?</Text>
           </View>
 
-          <Pressable style={styles.primaryButton} onPress={() => router.push('/live-map-page')}>
-            <Text style={styles.primaryButtonText}>Login</Text>
+          <Pressable
+            style={[styles.primaryButton, isLoading && { opacity: 0.7 }]}
+            onPress={handleLogin}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.primaryButtonText}>Login</Text>
+            )}
           </Pressable>
 
           <Pressable style={styles.socialButton}>

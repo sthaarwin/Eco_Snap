@@ -1,8 +1,9 @@
 import { Link, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View, ActivityIndicator, Alert } from 'react-native';
 
 import { EcoColors, EcoRadius, EcoSpacing } from '@/constants/ecosnap-theme';
+import { supabase } from '@/lib/supabase';
 
 export default function SignupScreen() {
   const router = useRouter();
@@ -10,6 +11,42 @@ export default function SignupScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  async function handleSignUp() {
+    if (!name || !email || !password) {
+      Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+    if (password !== confirmPassword) {
+      Alert.alert('Error', 'Passwords do not match');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            username: name,
+          },
+        },
+      });
+
+      if (error) throw error;
+
+      if (data.user) {
+        Alert.alert('Success', 'Account created! Please check your email for verification if required.');
+        router.replace('/');
+      }
+    } catch (error: any) {
+      Alert.alert('Sign Up Error', error.message || 'An unexpected error occurred');
+    } finally {
+      setIsLoading(false);
+    }
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -56,8 +93,16 @@ export default function SignupScreen() {
             secureTextEntry
           />
 
-          <Pressable style={styles.primaryButton} onPress={() => router.push('/live-map-page')}>
-            <Text style={styles.primaryButtonText}>Create Account</Text>
+          <Pressable
+            style={[styles.primaryButton, isLoading && { opacity: 0.7 }]}
+            onPress={handleSignUp}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.primaryButtonText}>Create Account</Text>
+            )}
           </Pressable>
 
           <View style={styles.footerRow}>
