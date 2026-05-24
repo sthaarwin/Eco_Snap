@@ -91,26 +91,71 @@ export default function CouncilPageScreen() {
   };
 
   return (
+      // votes state holds counts and current user vote per item
+      const [votes, setVotes] = useState<
+        Record<string, { likes: number; dislikes: number; vote: 'none' | 'like' | 'dislike' }>
+      >(() => {
+        const map: Record<string, { likes: number; dislikes: number; vote: 'none' | 'like' | 'dislike' }> = {};
+        initialItems.forEach((it) => {
+          map[it.id] = { likes: 0, dislikes: 0, vote: 'none' };
+        });
+        return map;
+      });
+
+      const handleVote = (id: string, type: 'like' | 'dislike') => {
+        setVotes((prev) => {
+          const cur = prev[id] || { likes: 0, dislikes: 0, vote: 'none' };
+          const next = { ...prev };
+
+          if (type === 'like') {
+            if (cur.vote === 'like') {
+              // unvote
+              next[id] = { ...cur, likes: Math.max(0, cur.likes - 1), vote: 'none' };
+            } else {
+              // switch from dislike or none -> like
+              const newLikes = Math.min(20, cur.likes + 1);
+              const newDislikes = cur.vote === 'dislike' ? Math.max(0, cur.dislikes - 1) : cur.dislikes;
+              next[id] = { likes: newLikes, dislikes: newDislikes, vote: 'like' };
+            }
+          } else {
+            if (cur.vote === 'dislike') {
+              // unvote
+              next[id] = { ...cur, dislikes: Math.max(0, cur.dislikes - 1), vote: 'none' };
+            } else {
+              const newDislikes = Math.min(20, cur.dislikes + 1);
+              const newLikes = cur.vote === 'like' ? Math.max(0, cur.likes - 1) : cur.likes;
+              next[id] = { likes: newLikes, dislikes: newDislikes, vote: 'dislike' };
+            }
+          }
+
+          return next;
+        });
+      };
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.header}>Community Verification</Text>
         <Text style={styles.subheader}>
-          Evaluate peer findings to keep mission intelligence trusted and actionable.
+        count,
+        selected,
+        disabled,
+        onPress,
         </Text>
 
         <View style={styles.statsRow}>
-          <View style={styles.statCard}>
+        count: number;
+        selected?: boolean;
+        disabled?: boolean;
+        onPress: () => void;
             <Text style={styles.statLabel}>Pending Reviews</Text>
-            <Text style={styles.statValue}>{items.length}</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statLabel}>Your Accuracy</Text>
-            <Text style={styles.statValue}>98%</Text>
-          </View>
+          if (disabled) return;
         </View>
 
         {items.map((item) => (
           <View style={styles.card} key={item.id}>
+          onPress();
             <Image source={{ uri: item.image }} style={styles.image} />
             <View style={styles.cardBody}>
               <View style={styles.cardHeaderRow}>
