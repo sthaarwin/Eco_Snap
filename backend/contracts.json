@@ -1,0 +1,88 @@
+{
+  "mission_response": {
+    "id": "string",
+    "narrative": "string",
+    "title": "string",
+    "coordinates": { "lat": "float", "lng": "float" },
+    "priority": "int",
+    "status": "string",
+    "location_name": "string|null",
+    "weather_trigger": "string|null",
+    "created_at": "string",
+    "expires_at": "string|null"
+  },
+  "submission_request": {
+    "mission_id": "string",
+    "image_base64": "string",
+    "latitude": "float",
+    "longitude": "float"
+  },
+  "submission_response": {
+    "id": "string",
+    "mission_id": "string",
+    "user_id": "string",
+    "image_url": "string",
+    "confidence_score": "float|null",
+    "verification_status": "string",
+    "created_at": "string"
+  },
+  "verification_result": {
+    "submission_id": "string",
+    "confidence_score": "float",
+    "verdict": "string",
+    "ai_reasoning": "string"
+  },
+  "ai_verification_request": {
+    "submission_id": "string",
+    "confidence_score": "float",
+    "verdict": "string|null",
+    "ai_reasoning": "string"
+  },
+  "ai_verification_response": {
+    "submission_id": "string",
+    "confidence_score": "float",
+    "verdict": "string",
+    "auto_approved": "bool",
+    "reward_awarded": "int"
+  },
+  "vote_request": {
+    "submission_id": "string",
+    "vote": "bool"
+  },
+  "vote_response": {
+    "submission_id": "string",
+    "total_votes": "int",
+    "approval_pct": "int",
+    "final_status": "string"
+  },
+  "profile_response": {
+    "id": "string",
+    "username": "string",
+    "xp": "int",
+    "level": "int",
+    "role": "string"
+  },
+  "hotspot_response": {
+    "id": "string",
+    "coordinates": { "lat": "float", "lng": "float" },
+    "status": "string",
+    "severity": "int"
+  },
+  "weather_ingestion_request": {
+    "temperature": "float",
+    "condition": "string",
+    "wind_speed": "float",
+    "humidity": "float",
+    "location_name": "string",
+    "raw_response": "object|null"
+  },
+  "weather_log_response": {
+    "id": "string",
+    "temperature": "float",
+    "condition": "string",
+    "wind_speed": "float",
+    "humidity": "float",
+    "location_name": "string",
+    "created_at": "string"
+  }
+}

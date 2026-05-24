@@ -1,0 +1,92 @@
+@baseUrl = {{$dotenv SUPABASE_URL}}/functions/v1
+@token = {{$dotenv SUPABASE_USER_JWT}}
+@missionId = replace-with-mission-id
+@submissionId = replace-with-submission-id
+
+### List active missions
+GET {{baseUrl}}/mission-engine/missions?status=active
+Authorization: Bearer {{token}}
+
+### Create mission (council user)
+POST {{baseUrl}}/mission-engine/missions
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "Plastic Surge in Block C",
+  "narrative": "Emergency cleanup requested near Block C.",
+  "coordinates": { "lat": 28.7041, "lng": 77.1025 },
+  "priority": 5,
+  "location_name": "Block C",
+  "weather_trigger": "heavy_rain",
+  "expires_at": null
+}
+
+### Submit mission evidence
+POST {{baseUrl}}/submission-engine/submit
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "mission_id": "{{missionId}}",
+  "image_base64": "replace-with-base64-jpeg",
+  "latitude": 28.7041,
+  "longitude": 77.1025
+}
+
+### Manual verification (council user)
+POST {{baseUrl}}/submission-engine/verify
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "submission_id": "{{submissionId}}",
+  "confidence_score": 0.92,
+  "verdict": "approved",
+  "ai_reasoning": "Waste item and cleanup context are visible."
+}
+
+### AI verification receiver (council/service user)
+POST {{baseUrl}}/ai-verification-receiver/verify
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "submission_id": "{{submissionId}}",
+  "confidence_score": 0.94,
+  "ai_reasoning": "Gemini detected cleanup completion with high confidence."
+}
+
+### Weather ingestion (council/service user)
+POST {{baseUrl}}/weather-ingestion/weather
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "temperature": 28.5,
+  "condition": "heavy_rain",
+  "wind_speed": 8.2,
+  "humidity": 84,
+  "location_name": "Campus Block C",
+  "raw_response": {
+    "source": "openweathermap"
+  }
+}
+
+### Council vote
+POST {{baseUrl}}/vote-engine/vote
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "submission_id": "{{submissionId}}",
+  "vote": true
+}
+
+### Vote tally
+GET {{baseUrl}}/vote-engine/votes/{{submissionId}}
+Authorization: Bearer {{token}}
+
+### Leaderboard
+GET {{baseUrl}}/reward-distribution/leaderboard?limit=10
+Authorization: Bearer {{token}}

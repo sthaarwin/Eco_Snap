@@ -1,0 +1,23 @@
+[functions.mission-engine]
+verify_jwt = true
+import_map = "./import_map.json"
+
+[functions.reward-distribution]
+verify_jwt = true
+import_map = "./import_map.json"
+
+[functions.submission-engine]
+verify_jwt = true
+import_map = "./import_map.json"
+
+[functions.vote-engine]
+verify_jwt = true
+import_map = "./import_map.json"
+
+[functions.ai-verification-receiver]
+verify_jwt = true
+import_map = "./import_map.json"
+
+[functions.weather-ingestion]
+verify_jwt = true
+import_map = "./import_map.json"
