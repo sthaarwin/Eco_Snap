@@ -173,8 +173,21 @@ export default function LiveMapPageScreen() {
             }
           }
         });
-        setMissions(mapped.sort((a, b) => b.priority - a.priority));
 
+        // Inject Demo Mission at user's current location
+        const demoMission: Mission = {
+          id: 'demo-mission-id',
+          title: 'Immediate Anomaly Verification (Demo)',
+          narrative: 'Sensors detect a localized anomaly exactly at your coordinates. Verify immediately to secure the sector.',
+          coordinates: { lat: uLat + 0.0001, lng: uLng + 0.0001 },
+          priority: 5,
+          status: 'active',
+          weather_trigger: null,
+          location_name: 'Current Sector',
+          created_at: new Date().toISOString()
+        };
+
+        setMissions([demoMission, ...mapped].sort((a, b) => b.priority - a.priority));
       }
     };
 
