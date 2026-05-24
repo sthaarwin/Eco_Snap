@@ -11,9 +11,9 @@ const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY') || ''              // used
 const GEMINI_DESCRIPTION_API_KEY = Deno.env.get('GEMINI_DESCRIPTION_API_KEY') || '' // used ONLY for generate-narrative (text)
 const AI_SERVICE_KEY = Deno.env.get('AI_SERVICE_KEY') || ''
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || ''
-const GEMINI_TEXT_MODEL = 'gemini-1.5-flash'
-const GEMINI_VISION_MODEL = 'gemini-1.5-flash'
-const FALLBACK_VISION_MODEL = 'gemini-1.5-flash'
+const GEMINI_TEXT_MODEL = 'gemini-flash-latest'
+const GEMINI_VISION_MODEL = 'gemini-flash-latest'
+const FALLBACK_VISION_MODEL = 'gemini-flash-latest'
 
 const VERIFY_APPROVAL_CONFIDENCE = 0.85
 const VERIFY_REJECTION_CONFIDENCE = 0.75
