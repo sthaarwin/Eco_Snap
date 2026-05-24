@@ -1,20 +1,153 @@
-import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
-import type { DimensionValue } from 'react-native';
+import { useEffect, useState } from 'react';
+import * as Location from 'expo-location';
+import { Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { EcoColors, EcoRadius, EcoSpacing } from '@/constants/ecosnap-theme';
+import { supabase } from '@/lib/supabase';
+import { MapView, Marker } from '@/components/map-view';
 
-const hotspots: Array<{
+type Hotspot = {
   id: string;
-  severity: 'high' | 'medium' | 'low';
-  x: DimensionValue;
-  y: DimensionValue;
-}> = [
-  { id: 'H-14', severity: 'high', x: '72%', y: '30%' },
-  { id: 'H-09', severity: 'medium', x: '36%', y: '48%' },
-  { id: 'H-03', severity: 'low', x: '52%', y: '70%' },
-];
+  coordinates: { lat: number; lng: number };
+  status: 'active' | 'resolved';
+  severity: number;
+  category: string;
+  mission_id: string | null;
+  created_at: string;
+};
+
+type CurrentLocation = {
+  latitude: number;
+  longitude: number;
+  accuracy: number | null;
+};
+
+const DEFAULT_REGION = {
+  latitude: 28.7041,
+  longitude: 77.1025,
+  latitudeDelta: 0.05,
+  longitudeDelta: 0.05,
+};
 
 export default function LiveMapPageScreen() {
+  const [hotspots, setHotspots] = useState<Hotspot[]>([]);
+  const [currentLocation, setCurrentLocation] = useState<CurrentLocation | null>(null);
+  const [mapRegion, setMapRegion] = useState(DEFAULT_REGION);
+  const [locationStatus, setLocationStatus] = useState('Finding your GPS location...');
+
+  useEffect(() => {
+    const fetchHotspots = async () => {
+      const { data, error } = await supabase
+        .from('hotspots')
+        .select('*')
+        .order('severity', { ascending: false });
+
+      if (!error && data) {
+        setHotspots(data as unknown as Hotspot[]);
+      }
+    };
+
+    fetchHotspots();
+
+    const channel = supabase
+      .channel('hotspots')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'hotspots' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          setHotspots((prev) => [payload.new as Hotspot, ...prev]);
+        } else if (payload.eventType === 'UPDATE') {
+          setHotspots((prev) =>
+            prev.map((h) => (h.id === (payload.new as Hotspot).id ? (payload.new as Hotspot) : h)),
+          );
+        } else if (payload.eventType === 'DELETE') {
+          setHotspots((prev) => prev.filter((h) => h.id !== (payload.old as Hotspot).id));
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  useEffect(() => {
+    let locationSubscription: Location.LocationSubscription | null = null;
+    let isMounted = true;
+
+    const updateLocation = (location: Location.LocationObject) => {
+      const nextLocation = {
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+        accuracy: location.coords.accuracy,
+      };
+
+      setCurrentLocation(nextLocation);
+      setMapRegion((region) => ({
+        ...region,
+        latitude: nextLocation.latitude,
+        longitude: nextLocation.longitude,
+      }));
+      setLocationStatus(
+        nextLocation.accuracy
+          ? `Current location accurate to ${Math.round(nextLocation.accuracy)}m`
+          : 'Current GPS location active',
+      );
+    };
+
+    const startLocationTracking = async () => {
+      const servicesEnabled = await Location.hasServicesEnabledAsync();
+      if (!servicesEnabled) {
+        setLocationStatus('Turn on location services to show your current position.');
+        return;
+      }
+
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== Location.PermissionStatus.GRANTED) {
+        setLocationStatus('Location permission is needed to show your current position.');
+        return;
+      }
+
+      const initialLocation = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+
+      if (isMounted) {
+        updateLocation(initialLocation);
+      }
+
+      locationSubscription = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.High,
+          distanceInterval: 5,
+          timeInterval: 5000,
+        },
+        (location) => {
+          if (isMounted) {
+            updateLocation(location);
+          }
+        },
+      );
+    };
+
+    startLocationTracking().catch(() => {
+      if (isMounted) {
+        setLocationStatus('Unable to read your GPS location right now.');
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      locationSubscription?.remove();
+    };
+  }, []);
+
+  const severityColor = (severity: number) => {
+    if (severity >= 4) return '#ef4444';
+    if (severity >= 2) return '#f59e0b';
+    return '#22c55e';
+  };
+
+  const activeHotspots = hotspots.filter((h) => h.status === 'active');
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container}>
@@ -23,33 +156,85 @@ export default function LiveMapPageScreen() {
           Real-time field telemetry from scout submissions and sensor stations.
         </Text>
 
-        <View style={styles.mapCard}>
-          <View style={styles.gridOverlay}>
-            {Array.from({ length: 6 }).map((_, index) => (
-              <View key={`line-${index}`} style={[styles.gridLine, { top: `${index * 20}%` }]} />
+        {Platform.OS === 'web' ? (
+          <View style={styles.mapCard}>
+            <View style={styles.gridOverlay}>
+              {Array.from({ length: 6 }).map((_, index) => (
+                <View key={`line-${index}`} style={[styles.gridLine, { top: `${index * 20}%` }]} />
+              ))}
+            </View>
+
+            {activeHotspots.map((spot) => (
+              <View
+                key={spot.id}
+                style={[
+                  styles.hotspot,
+                  {
+                    left: `${((spot.coordinates.lng + 180) / 360) * 80 + 10}%` as any,
+                    top: `${((90 - spot.coordinates.lat) / 180) * 80 + 10}%` as any,
+                    backgroundColor: severityColor(spot.severity),
+                  },
+                ]}
+              />
             ))}
+
+            {currentLocation ? (
+              <View
+                style={[
+                  styles.currentLocation,
+                  {
+                    left: `${((currentLocation.longitude + 180) / 360) * 80 + 10}%` as any,
+                    top: `${((90 - currentLocation.latitude) / 180) * 80 + 10}%` as any,
+                  },
+                ]}
+              />
+            ) : null}
+
+            <Text style={styles.mapLabel}>
+              {activeHotspots.length} hotspot{activeHotspots.length !== 1 ? 's' : ''} active
+            </Text>
           </View>
+        ) : (
+          <View style={styles.mapCard}>
+            <MapView
+              style={StyleSheet.absoluteFill}
+              region={mapRegion}
+              showsMyLocationButton
+              showsUserLocation
+            >
+              {currentLocation ? (
+                <Marker
+                  coordinate={currentLocation}
+                  pinColor={EcoColors.primary}
+                  title="Current location"
+                  description={locationStatus}
+                />
+              ) : null}
 
-          {hotspots.map((spot) => (
-            <View
-              key={spot.id}
-              style={[
-                styles.hotspot,
-                {
-                  left: spot.x,
-                  top: spot.y,
-                  backgroundColor:
-                    spot.severity === 'high'
-                      ? '#ef4444'
-                      : spot.severity === 'medium'
-                        ? '#f59e0b'
-                        : '#22c55e',
-                },
-              ]}
-            />
-          ))}
+              {activeHotspots.map((spot) => (
+                <Marker
+                  key={spot.id}
+                  coordinate={{
+                    latitude: spot.coordinates.lat,
+                    longitude: spot.coordinates.lng,
+                  }}
+                  pinColor={severityColor(spot.severity)}
+                  title={`Severity ${spot.severity}`}
+                  description={(spot.category || 'Unknown Category').replace(/_/g, ' ')}
+                />
+              ))}
+            </MapView>
+          </View>
+        )}
 
-          <Text style={styles.mapLabel}>Sector 7 Network</Text>
+        <View style={styles.locationCard}>
+          <Text style={styles.locationTitle}>GPS Current Location</Text>
+          <Text style={styles.locationText}>{locationStatus}</Text>
+          {currentLocation ? (
+            <Text style={styles.locationCoords}>
+              {currentLocation.latitude.toFixed(5)}, {currentLocation.longitude.toFixed(5)}
+            </Text>
+          ) : null}
         </View>
 
         <View style={styles.legendRow}>
@@ -69,9 +254,15 @@ export default function LiveMapPageScreen() {
 
         <View style={styles.feedCard}>
           <Text style={styles.feedTitle}>Live Feed</Text>
-          <Text style={styles.feedItem}>H-14 methane spike detected. Council pinged.</Text>
-          <Text style={styles.feedItem}>New scout report tagged: river plastic cluster.</Text>
-          <Text style={styles.feedItem}>Weather update: mild winds, ideal mission window.</Text>
+          {activeHotspots.length === 0 ? (
+            <Text style={styles.feedItem}>No active hotspots. All clear.</Text>
+          ) : (
+            activeHotspots.slice(0, 5).map((spot) => (
+              <Text key={spot.id} style={styles.feedItem}>
+                {(spot.category || 'Unknown Category').replace(/_/g, ' ')} detected (severity {spot.severity}).
+              </Text>
+            ))
+          )}
         </View>
 
         <Pressable style={styles.primaryButton}>
@@ -129,6 +320,17 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#fff',
   },
+  currentLocation: {
+    position: 'absolute',
+    width: 18,
+    height: 18,
+    marginLeft: -9,
+    marginTop: -9,
+    borderRadius: EcoRadius.pill,
+    borderWidth: 3,
+    borderColor: '#fff',
+    backgroundColor: EcoColors.primary,
+  },
   mapLabel: {
     position: 'absolute',
     left: EcoSpacing.md,
@@ -138,6 +340,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: EcoSpacing.sm,
     paddingVertical: 5,
     color: EcoColors.text,
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  locationCard: {
+    borderRadius: EcoRadius.lg,
+    borderColor: EcoColors.border,
+    borderWidth: 1,
+    backgroundColor: EcoColors.surface,
+    padding: EcoSpacing.md,
+    gap: 4,
+  },
+  locationTitle: {
+    color: EcoColors.text,
+    fontWeight: '800',
+    fontSize: 15,
+  },
+  locationText: {
+    color: EcoColors.textMuted,
+    lineHeight: 20,
+  },
+  locationCoords: {
+    color: EcoColors.primary,
     fontWeight: '700',
     fontSize: 12,
   },
@@ -183,6 +407,7 @@ const styles = StyleSheet.create({
   feedItem: {
     color: EcoColors.textMuted,
     lineHeight: 21,
+    textTransform: 'capitalize',
   },
   primaryButton: {
     backgroundColor: EcoColors.primary,
