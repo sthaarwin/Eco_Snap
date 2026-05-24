@@ -7,7 +7,6 @@ import { EcoColors, EcoRadius, EcoSpacing } from '@/constants/ecosnap-theme';
 export default function ScanScreen() {
   const cameraRef = useRef<CameraView | null>(null);
   const [permission, requestPermission] = useCameraPermissions();
-  const [scannedValue, setScannedValue] = useState<string | null>(null);
   const [isTakingPicture, setIsTakingPicture] = useState(false);
 
   useEffect(() => {
@@ -15,14 +14,6 @@ export default function ScanScreen() {
       void requestPermission();
     }
   }, [permission, requestPermission]);
-
-  const handleBarcodeScanned = ({ data, type }: { data: string; type: string }) => {
-    if (scannedValue) {
-      return;
-    }
-
-    setScannedValue(`${type}: ${data}`);
-  };
 
   const handleShutterPress = async () => {
     if (isTakingPicture || !cameraRef.current) {
@@ -33,7 +24,6 @@ export default function ScanScreen() {
 
     try {
       await cameraRef.current.takePictureAsync({ quality: 0.7, skipProcessing: true });
-      setScannedValue('Photo captured. Point the camera at a QR or marker to scan.');
     } finally {
       setIsTakingPicture(false);
     }
@@ -56,7 +46,7 @@ export default function ScanScreen() {
           <View style={styles.card}>
             <Text style={styles.title}>Camera access needed</Text>
             <Text style={styles.body}>
-              Allow camera permission so EcoSnap can scan mission markers and QR codes.
+              Allow camera permission so EcoSnap can capture mission photos.
             </Text>
             <Pressable style={styles.primaryButton} onPress={() => void requestPermission()}>
               <Text style={styles.primaryButtonText}>Allow camera</Text>
@@ -81,8 +71,6 @@ export default function ScanScreen() {
               ref={cameraRef}
               style={styles.cameraPreview}
               facing="back"
-              barcodeScannerSettings={{ barcodeTypes: ['qr', 'ean13', 'ean8', 'code128'] }}
-              onBarcodeScanned={handleBarcodeScanned}
             />
           )}
 
@@ -94,10 +82,6 @@ export default function ScanScreen() {
               <View style={styles.cornerBottomRight} />
             </View>
             <Text style={styles.title}>Scan Ready</Text>
-            <Text style={styles.body}>
-              Point the camera at a mission marker or field QR to register the next action.
-            </Text>
-            {scannedValue ? <Text style={styles.result}>{scannedValue}</Text> : null}
           </View>
         </View>
 
@@ -232,16 +216,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
     maxWidth: 320,
-  },
-  result: {
-    color: '#fff',
-    backgroundColor: 'rgba(10, 22, 16, 0.48)',
-    paddingHorizontal: EcoSpacing.md,
-    paddingVertical: 10,
-    borderRadius: EcoRadius.lg,
-    textAlign: 'center',
-    overflow: 'hidden',
-    fontWeight: '700',
   },
   primaryButton: {
     backgroundColor: EcoColors.primary,

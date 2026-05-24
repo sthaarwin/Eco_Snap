@@ -1,5 +1,7 @@
-import { useState, useRef } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { useRef, useState } from 'react';
 import {
+  Animated,
   Image,
   Pressable,
   SafeAreaView,
@@ -7,9 +9,7 @@ import {
   StyleSheet,
   Text,
   View,
-  Animated,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 
 import { EcoColors, EcoRadius, EcoSpacing } from '@/constants/ecosnap-theme';
 
@@ -20,6 +20,12 @@ type Verification = {
   urgency: 'LOW' | 'URGENT';
   confidence: number;
   image: string;
+};
+
+type VoteState = {
+  likes: number;
+  dislikes: number;
+  vote: 'none' | 'like' | 'dislike';
 };
 
 const initialItems: Verification[] = [
@@ -43,147 +49,179 @@ const initialItems: Verification[] = [
   },
 ];
 
+function ActionButton({
+  iconName,
+  primary,
+  count,
+  selected,
+  disabled,
+  onPress,
+}: {
+  iconName: 'thumbs-up' | 'thumbs-down';
+  primary?: boolean;
+  count: number;
+  selected?: boolean;
+  disabled?: boolean;
+  onPress: () => void;
+}) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  const handlePress = () => {
+    if (disabled) return;
+
+    Animated.sequence([
+      Animated.timing(anim, { toValue: -8, duration: 120, useNativeDriver: true }),
+      Animated.timing(anim, { toValue: 0, duration: 160, useNativeDriver: true }),
+    ]).start();
+
+    onPress();
+  };
+
+  return (
+    <View style={styles.actionColumn}>
+      <Pressable
+        onPress={handlePress}
+        style={[
+          primary ? styles.primaryButton : styles.secondaryButton,
+          { width: '100%' },
+          selected ? styles.selectedButton : null,
+          disabled ? styles.disabledButton : null,
+        ]}
+        accessibilityRole="button"
+        disabled={disabled}>
+        <Animated.View style={{ transform: [{ translateY: anim }], alignItems: 'center' }}>
+          <Ionicons name={iconName} size={20} color={primary ? '#fff' : EcoColors.text} />
+        </Animated.View>
+      </Pressable>
+      <Text style={styles.counterText}>{count}/20</Text>
+    </View>
+  );
+}
+
 export default function CouncilPageScreen() {
   const [items, setItems] = useState(initialItems);
-  
-  function ActionButton({
-    iconName,
-    primary,
-    initial = 0,
-  }: {
-    iconName: string;
-    primary?: boolean;
-    initial?: number;
-  }) {
-    const [count, setCount] = useState<number>(initial);
-    const anim = useRef(new Animated.Value(0)).current;
-
-    const handlePress = () => {
-      // increment until 20
-      setCount((c) => Math.min(20, c + 1));
-      Animated.sequence([
-        Animated.timing(anim, { toValue: -8, duration: 120, useNativeDriver: true }),
-        Animated.timing(anim, { toValue: 0, duration: 160, useNativeDriver: true }),
-      ]).start();
-    };
-
-    return (
-      <View style={styles.actionColumn}>
-        <Pressable
-          onPress={handlePress}
-          style={[primary ? styles.primaryButton : styles.secondaryButton, { width: '100%' }]}
-          accessibilityRole="button">
-          <Animated.View style={{ transform: [{ translateY: anim }] }}>
-            <Ionicons
-              name={iconName as any}
-              size={20}
-              color={primary ? '#fff' : EcoColors.text}
-            />
-          </Animated.View>
-        </Pressable>
-        <Text style={styles.counterText}>{count}/20</Text>
-      </View>
-    );
-  }
+  const [votes, setVotes] = useState<Record<string, VoteState>>(() => {
+    const initialVotes: Record<string, VoteState> = {};
+    initialItems.forEach((item) => {
+      initialVotes[item.id] = { likes: 0, dislikes: 0, vote: 'none' };
+    });
+    return initialVotes;
+  });
 
   const complete = (id: string) => {
     setItems((current) => current.filter((item) => item.id !== id));
   };
 
-  return (
-      // votes state holds counts and current user vote per item
-      const [votes, setVotes] = useState<
-        Record<string, { likes: number; dislikes: number; vote: 'none' | 'like' | 'dislike' }>
-      >(() => {
-        const map: Record<string, { likes: number; dislikes: number; vote: 'none' | 'like' | 'dislike' }> = {};
-        initialItems.forEach((it) => {
-          map[it.id] = { likes: 0, dislikes: 0, vote: 'none' };
-        });
-        return map;
-      });
+  const handleVote = (id: string, type: 'like' | 'dislike') => {
+    setVotes((prev) => {
+      const current = prev[id] ?? { likes: 0, dislikes: 0, vote: 'none' as const };
 
-      const handleVote = (id: string, type: 'like' | 'dislike') => {
-        setVotes((prev) => {
-          const cur = prev[id] || { likes: 0, dislikes: 0, vote: 'none' };
-          const next = { ...prev };
+      if (type === 'like') {
+        if (current.vote === 'like') {
+          return {
+            ...prev,
+            [id]: { ...current, likes: Math.max(0, current.likes - 1), vote: 'none' },
+          };
+        }
 
-          if (type === 'like') {
-            if (cur.vote === 'like') {
-              // unvote
-              next[id] = { ...cur, likes: Math.max(0, cur.likes - 1), vote: 'none' };
-            } else {
-              // switch from dislike or none -> like
-              const newLikes = Math.min(20, cur.likes + 1);
-              const newDislikes = cur.vote === 'dislike' ? Math.max(0, cur.dislikes - 1) : cur.dislikes;
-              next[id] = { likes: newLikes, dislikes: newDislikes, vote: 'like' };
-            }
-          } else {
-            if (cur.vote === 'dislike') {
-              // unvote
-              next[id] = { ...cur, dislikes: Math.max(0, cur.dislikes - 1), vote: 'none' };
-            } else {
-              const newDislikes = Math.min(20, cur.dislikes + 1);
-              const newLikes = cur.vote === 'like' ? Math.max(0, cur.likes - 1) : cur.likes;
-              next[id] = { likes: newLikes, dislikes: newDislikes, vote: 'dislike' };
-            }
-          }
+        return {
+          ...prev,
+          [id]: {
+            likes: Math.min(20, current.likes + 1),
+            dislikes: current.vote === 'dislike' ? Math.max(0, current.dislikes - 1) : current.dislikes,
+            vote: 'like',
+          },
+        };
+      }
 
-          return next;
-        });
+      if (current.vote === 'dislike') {
+        return {
+          ...prev,
+          [id]: { ...current, dislikes: Math.max(0, current.dislikes - 1), vote: 'none' },
+        };
+      }
+
+      return {
+        ...prev,
+        [id]: {
+          likes: current.vote === 'like' ? Math.max(0, current.likes - 1) : current.likes,
+          dislikes: Math.min(20, current.dislikes + 1),
+          vote: 'dislike',
+        },
       };
+    });
+  };
+
+  return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.header}>Community Verification</Text>
         <Text style={styles.subheader}>
-        count,
-        selected,
-        disabled,
-        onPress,
+          Evaluate peer findings to keep mission intelligence trusted and actionable.
         </Text>
 
         <View style={styles.statsRow}>
-        count: number;
-        selected?: boolean;
-        disabled?: boolean;
-        onPress: () => void;
+          <View style={styles.statCard}>
             <Text style={styles.statLabel}>Pending Reviews</Text>
+            <Text style={styles.statValue}>{items.length}</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statLabel}>Your Accuracy</Text>
-          if (disabled) return;
+            <Text style={styles.statValue}>98%</Text>
+          </View>
         </View>
 
-        {items.map((item) => (
-          <View style={styles.card} key={item.id}>
-          onPress();
-            <Image source={{ uri: item.image }} style={styles.image} />
-            <View style={styles.cardBody}>
-              <View style={styles.cardHeaderRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.cardTitle}>{item.title}</Text>
-                  <Text style={styles.cardMeta}>{item.scout}</Text>
+        {items.map((item) => {
+          const vote = votes[item.id] ?? { likes: 0, dislikes: 0, vote: 'none' as const };
+
+          return (
+            <View style={styles.card} key={item.id}>
+              <Image source={{ uri: item.image }} style={styles.image} />
+              <View style={styles.cardBody}>
+                <View style={styles.cardHeaderRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.cardTitle}>{item.title}</Text>
+                    <Text style={styles.cardMeta}>{item.scout}</Text>
+                  </View>
+                  <Text
+                    style={[
+                      styles.urgencyTag,
+                      item.urgency === 'URGENT' ? styles.urgencyDanger : styles.urgencyLow,
+                    ]}>
+                    {item.urgency}
+                  </Text>
                 </View>
-                <Text
-                  style={[
-                    styles.urgencyTag,
-                    item.urgency === 'URGENT' ? styles.urgencyDanger : styles.urgencyLow,
-                  ]}>
-                  {item.urgency}
-                </Text>
-              </View>
 
-              <Text style={styles.cardMeta}>AI Confidence: {item.confidence}%</Text>
-              <View style={styles.progressBarTrack}>
-                <View style={[styles.progressBarFill, { width: `${item.confidence}%` }]} />
-              </View>
+                <Text style={styles.cardMeta}>AI Confidence: {item.confidence}%</Text>
+                <View style={styles.progressBarTrack}>
+                  <View style={[styles.progressBarFill, { width: `${item.confidence}%` }]} />
+                </View>
 
-              <View style={styles.actionRow}>
-                <ActionButton iconName="thumbs-down" />
-                <ActionButton iconName="thumbs-up" primary />
+                <View style={styles.actionRow}>
+                  <ActionButton
+                    iconName="thumbs-down"
+                    count={vote.dislikes}
+                    selected={vote.vote === 'dislike'}
+                    disabled={vote.vote === 'like'}
+                    onPress={() => handleVote(item.id, 'dislike')}
+                  />
+                  <ActionButton
+                    iconName="thumbs-up"
+                    primary
+                    count={vote.likes}
+                    selected={vote.vote === 'like'}
+                    disabled={vote.vote === 'dislike'}
+                    onPress={() => handleVote(item.id, 'like')}
+                  />
+                </View>
+
+                <Pressable style={styles.completeButton} onPress={() => complete(item.id)}>
+                  <Text style={styles.completeText}>Mark as Completed</Text>
+                </Pressable>
               </View>
             </View>
-          </View>
-        ))}
+          );
+        })}
       </ScrollView>
     </SafeAreaView>
   );
@@ -307,23 +345,38 @@ const styles = StyleSheet.create({
   primaryButton: {
     flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: 12,
     borderRadius: EcoRadius.md,
     backgroundColor: EcoColors.primary,
   },
-  primaryText: {
-    color: '#fff',
-    fontWeight: '700',
-  },
   secondaryButton: {
     flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: 12,
     borderRadius: EcoRadius.md,
     borderWidth: 1,
     borderColor: EcoColors.border,
+    backgroundColor: EcoColors.surface,
   },
-  secondaryText: {
+  selectedButton: {
+    borderWidth: 2,
+    borderColor: EcoColors.primarySoft,
+  },
+  disabledButton: {
+    opacity: 0.55,
+  },
+  completeButton: {
+    marginTop: 4,
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderRadius: EcoRadius.md,
+    borderWidth: 1,
+    borderColor: EcoColors.border,
+    backgroundColor: EcoColors.surfaceMuted,
+  },
+  completeText: {
     color: EcoColors.text,
     fontWeight: '600',
   },
