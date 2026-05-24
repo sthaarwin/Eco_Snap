@@ -1,5 +1,6 @@
 @baseUrl = {{$dotenv SUPABASE_URL}}/functions/v1
 @token = {{$dotenv SUPABASE_USER_JWT}}
+@aiKey = {{$dotenv AI_SERVICE_KEY}}
 @missionId = replace-with-mission-id
 @submissionId = replace-with-submission-id
 
@@ -72,6 +73,45 @@ Content-Type: application/json
     "source": "openweathermap"
   }
 }
+
+### ─── User 3: AI Engine & Weather Fetcher ─────────────────────────────────
+
+### Weather fetcher: fetch live from OpenWeatherMap → store in DB
+POST {{baseUrl}}/weather-fetcher/fetch
+Content-Type: application/json
+
+{
+  "lat": 28.7041,
+  "lng": 77.1025,
+  "location_name": "Campus Block C"
+}
+
+### AI Engine: generate narrative from weather data
+POST {{baseUrl}}/ai-engine/generate-narrative
+Content-Type: application/json
+
+{
+  "temperature": 28,
+  "condition": "Heavy Rain",
+  "wind_speed": 8.2,
+  "humidity": 84,
+  "location_name": "Campus Block C",
+  "lat": 28.7041,
+  "lng": 77.1025
+}
+
+### AI Engine: verify a submission image (after submitting evidence)
+POST {{baseUrl}}/ai-engine/verify-image
+Content-Type: application/json
+
+{
+  "submission_id": "{{submissionId}}"
+}
+
+### AI Engine: cluster users by behavior (warrior/scout)
+POST {{baseUrl}}/ai-engine/cluster-users
+Authorization: Bearer {{token}}
+Content-Type: application/json
 
 ### Council vote
 POST {{baseUrl}}/vote-engine/vote

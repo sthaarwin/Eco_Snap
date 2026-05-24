@@ -23,7 +23,7 @@ serve(async (req) => {
 
   const url = new URL(req.url)
   const method = req.method
-  const path = url.pathname.replace('/functions/v1/ai-verification-receiver', '')
+  const path = url.pathname.replace('/ai-verification-receiver', '')
 
   try {
     if (method === 'POST' && path === '/verify') {

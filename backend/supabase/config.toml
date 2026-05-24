@@ -15,9 +15,17 @@ verify_jwt = true
 import_map = "./import_map.json"
 
 [functions.ai-verification-receiver]
-verify_jwt = true
+verify_jwt = false
 import_map = "./import_map.json"
 
 [functions.weather-ingestion]
-verify_jwt = true
+verify_jwt = false
+import_map = "./import_map.json"
+
+[functions.ai-engine]
+verify_jwt = false
+import_map = "./import_map.json"
+
+[functions.weather-fetcher]
+verify_jwt = false
 import_map = "./import_map.json"

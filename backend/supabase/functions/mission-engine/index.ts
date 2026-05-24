@@ -14,7 +14,7 @@ serve(async (req) => {
   const supabase = createUserClient(req)
   const url = new URL(req.url)
   const method = req.method
-  const path = url.pathname.replace('/functions/v1/mission-engine', '')
+  const path = url.pathname.replace('/mission-engine', '')
 
   try {
     // GET /missions - List active missions
