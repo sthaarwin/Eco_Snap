@@ -1,5 +1,14 @@
-import { useState } from 'react';
-import { Image, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState, useRef } from 'react';
+import {
+  Image,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  Animated,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { EcoColors, EcoRadius, EcoSpacing } from '@/constants/ecosnap-theme';
@@ -36,6 +45,46 @@ const initialItems: Verification[] = [
 
 export default function CouncilPageScreen() {
   const [items, setItems] = useState(initialItems);
+  
+  function ActionButton({
+    iconName,
+    primary,
+    initial = 0,
+  }: {
+    iconName: string;
+    primary?: boolean;
+    initial?: number;
+  }) {
+    const [count, setCount] = useState<number>(initial);
+    const anim = useRef(new Animated.Value(0)).current;
+
+    const handlePress = () => {
+      // increment until 20
+      setCount((c) => Math.min(20, c + 1));
+      Animated.sequence([
+        Animated.timing(anim, { toValue: -8, duration: 120, useNativeDriver: true }),
+        Animated.timing(anim, { toValue: 0, duration: 160, useNativeDriver: true }),
+      ]).start();
+    };
+
+    return (
+      <View style={styles.actionColumn}>
+        <Pressable
+          onPress={handlePress}
+          style={primary ? styles.primaryButton : styles.secondaryButton}
+          accessibilityRole="button">
+          <Animated.View style={{ transform: [{ translateY: anim }] }}>
+            <Ionicons
+              name={iconName as any}
+              size={20}
+              color={primary ? '#fff' : EcoColors.text}
+            />
+          </Animated.View>
+        </Pressable>
+        <Text style={styles.counterText}>{count}/20</Text>
+      </View>
+    );
+  }
 
   const complete = (id: string) => {
     setItems((current) => current.filter((item) => item.id !== id));
@@ -84,18 +133,8 @@ export default function CouncilPageScreen() {
               </View>
 
               <View style={styles.actionRow}>
-                <Pressable
-                  style={styles.secondaryButton}
-                  onPress={() => complete(item.id)}
-                  accessibilityLabel="Dislike">
-                  <Ionicons name="thumbs-down" size={20} color={EcoColors.text} />
-                </Pressable>
-                <Pressable
-                  style={styles.primaryButton}
-                  onPress={() => complete(item.id)}
-                  accessibilityLabel="Like">
-                  <Ionicons name="thumbs-up" size={20} color="#fff" />
-                </Pressable>
+                <ActionButton iconName="thumbs-down" />
+                <ActionButton iconName="thumbs-up" primary />
               </View>
             </View>
           </View>
@@ -208,6 +247,17 @@ const styles = StyleSheet.create({
   actionRow: {
     flexDirection: 'row',
     gap: EcoSpacing.sm,
+  },
+  actionColumn: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 6,
+  },
+  counterText: {
+    marginTop: 6,
+    color: EcoColors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
   },
   primaryButton: {
     flex: 1,
