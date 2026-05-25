@@ -92,6 +92,7 @@ export default function AppTabs() {
       <Tabs.Screen name="mission-brief" options={{ title: 'Missions' }} />
       <Tabs.Screen name="scan" options={{ title: 'Scan' }} />
       <Tabs.Screen name="council-page" options={{ title: 'Council' }} />
+      <Tabs.Screen name="leaderboard" options={{ href: null, title: 'Leaderboard' }} />
       <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
     </Tabs>
   );
