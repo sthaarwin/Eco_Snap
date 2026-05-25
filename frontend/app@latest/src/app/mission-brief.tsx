@@ -7,6 +7,7 @@ import * as Location from 'expo-location';
 import { EcoColors, EcoRadius, EcoSpacing } from '@/constants/ecosnap-theme';
 import { supabase } from '@/lib/supabase';
 import { kMeans, Point } from '@/lib/clustering';
+import { setActiveQuestId } from '@/lib/quest-state';
 
 type Mission = {
   id: string;
@@ -196,6 +197,8 @@ export default function MissionBriefScreen() {
   const handleStartMission = () => {
     const selectedMission = missions[currentIndex];
     if (selectedMission) {
+      // Mark quest as started so the scan page knows
+      setActiveQuestId(selectedMission.id);
       router.push(`/live-map-page?tracking=true&missionId=${selectedMission.id}`);
     }
   };
