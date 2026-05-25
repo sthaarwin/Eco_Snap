@@ -180,21 +180,21 @@ export default function LiveMapPageScreen() {
       if (res.ok) {
         const data = await res.json();
         if (data.narrative) {
-          const text = `✨ ${data.narrative}`;
+          const text = `  ${data.narrative}`;
           narrativeCache[spot.id] = text;
           setAiNarrative(text);
         } else {
-          const text = `✨ (Gemini API Config Required): Sensors detect critical anomaly. Action required!`;
+          const text = ` (EcoAI API Config Required): Sensors detect critical anomaly. Action required!`;
           narrativeCache[spot.id] = text;
           setAiNarrative(text);
         }
       } else {
-        const text = `✨ (Gemini Bypass): Sensors detect critical anomalous signatures at these coordinates. Immediate verification mandated!`;
+        const text = ` (EcoAI Bypass): Sensors detect critical anomalous signatures at these coordinates. Immediate verification mandated!`;
         narrativeCache[spot.id] = text;
         setAiNarrative(text);
       }
     } catch {
-      const text = `✨ (Gemini Bypass): Sensors detect critical anomalous signatures at these coordinates. Immediate verification mandated!`;
+      const text = `  (EcoAI Bypass): Sensors detect critical anomalous signatures at these coordinates. Immediate verification mandated!`;
       narrativeCache[spot.id] = text;
       setAiNarrative(text);
     } finally {
@@ -542,7 +542,7 @@ export default function LiveMapPageScreen() {
             </View>
             <Text style={styles.popupBody}>
               {isImprovising ? (
-                <Text style={{ fontStyle: 'italic' }}>✨ Gemini is analyzing the anomaly...</Text>
+                <Text style={{ fontStyle: 'italic' }}>  EcoAI is analyzing the anomaly...</Text>
               ) : (
                 aiNarrative || selectedMission.narrative || 'No database narrative available.'
               )}
