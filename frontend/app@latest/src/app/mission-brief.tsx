@@ -247,16 +247,16 @@ export default function MissionBriefScreen() {
       });
       if (res.ok) {
         const data = await res.json();
-        const text = data.narrative ? `✨ ${data.narrative}` : `✨ Sensors detect hazardous readings requiring immediate attention.`;
+        const text = data.narrative ? `  ${data.narrative}` : `  Sensors detect hazardous readings requiring immediate attention.`;
         narrativeCache[selectedMission.id] = text;
         setAiNarrative(text);
       } else {
-        const fallback = `✨ (Gemini Bypass): AI verification requested. Environmental discrepancy flagged at ${locationName}.`;
+        const fallback = `  (EcoAI Bypass): AI verification requested. Environmental discrepancy flagged at ${locationName}.`;
         narrativeCache[selectedMission.id] = fallback;
         setAiNarrative(fallback);
       }
     } catch {
-      const fallback = `✨ (Gemini Bypass): AI verification requested. Environmental discrepancy flagged at ${locationName}.`;
+      const fallback = `  (EcoAI Bypass): AI verification requested. Environmental discrepancy flagged at ${locationName}.`;
       narrativeCache[selectedMission.id] = fallback;
       setAiNarrative(fallback);
     } finally {
@@ -401,7 +401,7 @@ export default function MissionBriefScreen() {
                   <ScrollView style={{ maxHeight: '50%', marginVertical: EcoSpacing.md }}>
                     <Text style={styles.modalSectionTitle}>Detailed Intelligence Report</Text>
                     {isImprovising ? (
-                      <Text style={[styles.modalBody, { fontStyle: 'italic' }]}>✨ Gemini is analyzing the anomaly...</Text>
+                      <Text style={[styles.modalBody, { fontStyle: 'italic' }]}>  EcoAI is analyzing the anomaly...</Text>
                     ) : (
                       <Text style={styles.modalBody}>
                         {aiNarrative || missions[currentIndex].narrative || 'Detailed documentation pending. Assess on-site.'}

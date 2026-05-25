@@ -123,7 +123,7 @@ export default function ScanScreen() {
 
       const result = await response.json() as { verification_status?: string; reward_awarded?: number; ai_reasoning?: string };
 
-      console.log('━━━ GEMINI RESPONSE LOG ━━━');
+      console.log('━━━ EcoAI RESPONSE LOG ━━━');
       console.log(`Status: ${result.verification_status}`);
       console.log(`Reasoning: ${result.ai_reasoning}`);
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -136,17 +136,17 @@ export default function ScanScreen() {
         // Clear the active quest since it's been completed
         clearActiveQuest();
         setHasActiveQuestState(false);
-        Alert.alert('✅ Approved', `Gemini verified your submission!${result.reward_awarded ? ` +${result.reward_awarded} XP awarded.` : ''}`, [
+        Alert.alert('✅ Approved', `EcoAI verified your submission!${result.reward_awarded ? ` +${result.reward_awarded} XP awarded.` : ''}`, [
           { text: 'OK', onPress: () => router.push('/council-page') },
         ]);
       } else if (result.verification_status === 'rejected') {
         const reason = result.ai_reasoning || 'The image was too blurry, too dark, or could not be understood.';
-        Alert.alert('❌ Submission Rejected', `Gemini rejected this photo.\n\nReason: ${reason}\n\nPlease retake the photo clearly.`, [
+        Alert.alert('❌ Submission Rejected', `EcoAI rejected this photo.\n\nReason: ${reason}\n\nPlease retake the photo clearly.`, [
           { text: 'Retake', style: 'cancel', onPress: handleRetake },
           { text: 'Cancel', onPress: () => router.push('/live-map-page') },
         ]);
       } else {
-        Alert.alert('🔍 Sent for Council Review', `Gemini was unsure about this submission and escalated it for human review.\n\n${result.ai_reasoning ? `AI note: ${result.ai_reasoning}` : ''}`, [
+        Alert.alert('🔍 Sent for Council Review', `EcoAI was unsure about this submission and escalated it for human review.\n\n${result.ai_reasoning ? `AI note: ${result.ai_reasoning}` : ''}`, [
           { text: 'OK', onPress: () => router.push('/council-page') },
         ]);
       }
