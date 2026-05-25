@@ -4,3 +4,4 @@ plan.md
 backend/supabase/.temp/
 backend/supabase/.branches/
 .csv
+node_modules/

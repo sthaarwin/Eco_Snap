@@ -10,11 +10,11 @@ serve(async (req) => {
   const supabase = createUserClient(req)
   const url = new URL(req.url)
   const method = req.method
-  const path = url.pathname.replace('/submission-engine', '')
+  const pathname = url.pathname
 
   try {
     // POST /submit - Upload image and create submission
-    if (method === 'POST' && path === '/submit') {
+    if (method === 'POST' && pathname.endsWith('/submit')) {
       const auth = await requireUser(req)
       if (auth.response) return auth.response
 
@@ -55,22 +55,61 @@ serve(async (req) => {
 
       if (dbError) throw dbError
 
-      // Auto-trigger AI verification via User 3's ai-engine (fire-and-forget)
+      // Trigger AI verification and wait for result so client can show final status immediately.
       const aiEngineUrl = `${Deno.env.get('SUPABASE_URL')!}/functions/v1/ai-engine/verify-image`
-      fetch(aiEngineUrl, {
+      const aiResponse = await fetch(aiEngineUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ submission_id: submission.id }),
-      }).catch((err) => console.error('ai-engine trigger failed:', err))
+      }).catch((err) => {
+        console.error('ai-engine trigger failed:', err)
+        return null
+      })
+
+      let auto_approved = false
+      let reward_awarded = 0
+      let ai_reasoning: string | undefined
+      let confidence_score: number | undefined
+
+      if (aiResponse?.ok) {
+        const aiResult = await aiResponse.json() as {
+          auto_approved?: boolean
+          reward_awarded?: number
+          verdict?: SubmissionResponse['verification_status']
+          ai_reasoning?: string
+          confidence_score?: number
+        }
+
+        auto_approved = Boolean(aiResult.auto_approved)
+        reward_awarded = aiResult.reward_awarded ?? 0
+        ai_reasoning = aiResult.ai_reasoning
+        confidence_score = aiResult.confidence_score
+      } else if (aiResponse) {
+        console.error('ai-engine verification failed:', aiResponse.status, await aiResponse.text())
+      }
+
+      // Re-fetch the finalized submission so we return the DB-persisted verification_status
+      const { data: finalizedSubmission } = await supabase
+        .from('mission_submissions')
+        .select('*')
+        .eq('id', submission.id)
+        .single()
 
       return new Response(
-        JSON.stringify(submission as SubmissionResponse),
+        JSON.stringify({
+          ...(finalizedSubmission ?? submission),
+          confidence_score: confidence_score ?? finalizedSubmission?.confidence_score,
+          verification_status: finalizedSubmission?.verification_status ?? submission.verification_status,
+          ai_reasoning,
+          auto_approved,
+          reward_awarded,
+        } satisfies SubmissionResponse & { auto_approved: boolean; reward_awarded: number; ai_reasoning?: string }),
         { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
     // GET /submissions - List submissions (filter by mission_id or user_id)
-    if (method === 'GET' && path === '/submissions') {
+    if (method === 'GET' && pathname.endsWith('/submissions')) {
       const missionId = url.searchParams.get('mission_id')
       const userId = url.searchParams.get('user_id')
       const status = url.searchParams.get('status')
@@ -98,7 +137,7 @@ serve(async (req) => {
     }
 
     // POST /verify - Manual AI verification trigger (for User 3 integration)
-    if (method === 'POST' && path === '/verify') {
+    if (method === 'POST' && pathname.endsWith('/verify')) {
       const auth = await requireUser(req)
       if (auth.response) return auth.response
 
@@ -148,8 +187,9 @@ serve(async (req) => {
     )
   } catch (err) {
     console.error('submission-engine error:', err)
+    const details = err instanceof Error ? err.message : String(err)
     return new Response(
-      JSON.stringify({ error: 'Internal server error', code: 'INTERNAL_ERROR', details: err.message } satisfies ApiError),
+      JSON.stringify({ error: 'Internal server error', code: 'INTERNAL_ERROR', details } satisfies ApiError),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }

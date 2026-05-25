@@ -1,24 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { Platform, Pressable, StyleSheet, Text, View, Modal, Image, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { supabase } from '@/lib/supabase';
+import { Alert, Image, Modal, Platform, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 
 import { EcoColors, EcoRadius, EcoSpacing } from '@/constants/ecosnap-theme';
+import { SUPABASE_URL, supabase } from '@/lib/supabase';
 
 export default function ScanScreen() {
   const cameraRef = useRef<CameraView | null>(null);
   const [permission, requestPermission] = useCameraPermissions();
   const router = useRouter();
-  const params = useLocalSearchParams<{ missionId?: string }>();
-
-  const [scannedValue, setScannedValue] = useState<string | null>(null);
   const [isTakingPicture, setIsTakingPicture] = useState(false);
-
-  const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [capturedPhotoUri, setCapturedPhotoUri] = useState<string | null>(null);
   const [capturedPhotoBase64, setCapturedPhotoBase64] = useState<string | null>(null);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
@@ -26,13 +21,6 @@ export default function ScanScreen() {
       void requestPermission();
     }
   }, [permission, requestPermission]);
-
-  const handleBarcodeScanned = ({ data, type }: { data: string; type: string }) => {
-    if (scannedValue) {
-      return;
-    }
-    setScannedValue(`${type}: ${data}`);
-  };
 
   const handleShutterPress = async () => {
     if (isTakingPicture || !cameraRef.current) {
@@ -48,17 +36,25 @@ export default function ScanScreen() {
         skipProcessing: true,
       });
 
-      if (!photo?.uri) {
-        Alert.alert('Photo error', 'Could not capture a photo. Please try again.');
-        return;
-      }
-
-      setCapturedPhotoUri(photo.uri);
-      setCapturedPhotoBase64(photo.base64 ? `data:image/jpeg;base64,${photo.base64}` : null);
+      setCapturedPhotoUri(photo?.uri ?? null);
+      setCapturedPhotoBase64(photo?.base64 ? `data:image/jpeg;base64,${photo.base64}` : null);
       setShowPreviewModal(true);
     } finally {
       setIsTakingPicture(false);
     }
+  };
+
+  const resolveActiveMissionId = async () => {
+    const { data, error } = await supabase
+      .from('missions')
+      .select('id')
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data?.id ?? null;
   };
 
   const handleRetake = () => {
@@ -71,30 +67,31 @@ export default function ScanScreen() {
     if (!capturedPhotoBase64 || isUploading) {
       return;
     }
-    if (!params.missionId) {
-      Alert.alert('No active mission', 'Cannot upload: no mission ID provided.');
-      return;
-    }
 
     setIsUploading(true);
     try {
+      const missionId = await resolveActiveMissionId();
+      if (!missionId) {
+        Alert.alert('No active mission', 'There is no active mission available to attach this upload.');
+        return;
+      }
+
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) {
         throw new Error('Your session expired. Please sign in again.');
       }
 
-      // We omit the edge-function URL explicitly to correctly map to Supabase edge function
-      const response = await fetch(`https://omrqdxvgkxqikkorsnwx.supabase.co/functions/v1/submission-engine/submit`, {
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/submission-engine/submit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
-          mission_id: params.missionId,
+          mission_id: missionId,
           image_base64: capturedPhotoBase64,
           latitude: 0,
-          longitude: 0, // Using placeholders depending on logic, since coordinates check is done locally on map screen
+          longitude: 0,
         }),
       });
 
@@ -103,19 +100,30 @@ export default function ScanScreen() {
         throw new Error(body || 'Upload failed');
       }
 
-      const result = await response.json() as { verification_status?: string; reward_awarded?: number };
+      const result = await response.json() as { verification_status?: string; reward_awarded?: number; ai_reasoning?: string };
+
+      console.log('━━━ GEMINI RESPONSE LOG ━━━');
+      console.log(`Status: ${result.verification_status}`);
+      console.log(`Reasoning: ${result.ai_reasoning}`);
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
       setShowPreviewModal(false);
       setCapturedPhotoUri(null);
       setCapturedPhotoBase64(null);
 
       if (result.verification_status === 'approved') {
-        Alert.alert('Approved', `Gemini approved this upload! XP was awarded${result.reward_awarded ? ` (+${result.reward_awarded})` : ''}.`, [
-          { text: "OK", onPress: () => router.push('/council-page') }
+        Alert.alert('✅ Approved', `Gemini verified your submission!${result.reward_awarded ? ` +${result.reward_awarded} XP awarded.` : ''}`, [
+          { text: 'OK', onPress: () => router.push('/council-page') },
+        ]);
+      } else if (result.verification_status === 'rejected') {
+        const reason = result.ai_reasoning || 'The image was too blurry, too dark, or could not be understood.';
+        Alert.alert('❌ Submission Rejected', `Gemini rejected this photo.\n\nReason: ${reason}\n\nPlease retake the photo clearly.`, [
+          { text: 'Retake', style: 'cancel', onPress: handleRetake },
+          { text: 'Cancel', onPress: () => router.push('/live-map-page') },
         ]);
       } else {
-        Alert.alert('Sent for review', 'Gemini marked this upload for council review.', [
-          { text: "OK", onPress: () => router.push('/council-page') }
+        Alert.alert('🔍 Sent for Council Review', `Gemini was unsure about this submission and escalated it for human review.\n\n${result.ai_reasoning ? `AI note: ${result.ai_reasoning}` : ''}`, [
+          { text: 'OK', onPress: () => router.push('/council-page') },
         ]);
       }
     } catch (error) {
@@ -143,7 +151,7 @@ export default function ScanScreen() {
           <View style={styles.card}>
             <Text style={styles.title}>Camera access needed</Text>
             <Text style={styles.body}>
-              Allow camera permission so EcoSnap can scan mission markers and QR codes.
+              Allow camera permission so EcoSnap can capture mission photos.
             </Text>
             <Pressable style={styles.primaryButton} onPress={() => void requestPermission()}>
               <Text style={styles.primaryButtonText}>Allow camera</Text>
@@ -168,8 +176,6 @@ export default function ScanScreen() {
               ref={cameraRef}
               style={styles.cameraPreview}
               facing="back"
-              barcodeScannerSettings={{ barcodeTypes: ['qr', 'ean13', 'ean8', 'code128'] }}
-              onBarcodeScanned={handleBarcodeScanned}
             />
           )}
 
@@ -181,10 +187,6 @@ export default function ScanScreen() {
               <View style={styles.cornerBottomRight} />
             </View>
             <Text style={styles.title}>Scan Ready</Text>
-            <Text style={styles.body}>
-              Snap a photo of clearing the quest
-            </Text>
-            {scannedValue ? <Text style={styles.result}>{scannedValue}</Text> : null}
           </View>
         </View>
 
@@ -202,9 +204,7 @@ export default function ScanScreen() {
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Preview Photo</Text>
-            {capturedPhotoUri ? (
-              <Image source={{ uri: capturedPhotoUri }} style={styles.previewImage} resizeMode="cover" />
-            ) : null}
+            {capturedPhotoUri ? <Image source={{ uri: capturedPhotoUri }} style={styles.previewImage} /> : null}
 
             <View style={styles.modalActions}>
               <Pressable style={styles.retakeButton} onPress={handleRetake}>
@@ -214,7 +214,7 @@ export default function ScanScreen() {
                 style={[styles.uploadButton, isUploading && styles.uploadButtonDisabled]}
                 onPress={() => void handleUpload()}
                 disabled={isUploading}>
-                <Text style={styles.uploadButtonText}>{isUploading ? 'Uploading...' : 'Submit to Gemini AI'}</Text>
+                <Text style={styles.uploadButtonText}>{isUploading ? 'Uploading...' : 'Upload'}</Text>
               </Pressable>
             </View>
           </View>
@@ -342,16 +342,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
     maxWidth: 320,
-  },
-  result: {
-    color: '#fff',
-    backgroundColor: 'rgba(10, 22, 16, 0.48)',
-    paddingHorizontal: EcoSpacing.md,
-    paddingVertical: 10,
-    borderRadius: EcoRadius.lg,
-    textAlign: 'center',
-    overflow: 'hidden',
-    fontWeight: '700',
   },
   primaryButton: {
     backgroundColor: EcoColors.primary,

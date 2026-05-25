@@ -105,6 +105,7 @@ export default function MissionBriefScreen() {
           }
         }
 
+
         let userProfileData = null;
         // Fetch user stats
         const { data: { session } } = await supabase.auth.getSession();
@@ -119,7 +120,6 @@ export default function MissionBriefScreen() {
             userProfileData = profileData;
           }
         }
-
         // Fetch active missions from supabase
         const { data, error } = await supabase
           .from('missions')
@@ -303,9 +303,9 @@ export default function MissionBriefScreen() {
                       />
                       <View style={styles.overlayLabel}>
                         <Text style={styles.overlayLabelText}>
-                          {mission.distance !== undefined
+                          {mission.location_name || (mission.distance !== undefined
                             ? (mission.distance < 1 ? `${Math.round(mission.distance * 1000)} m away` : `${mission.distance.toFixed(1)} km away`)
-                            : 'Nearby'}
+                            : 'Nearby')}
                         </Text>
                       </View>
                     </View>

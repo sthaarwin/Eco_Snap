@@ -59,6 +59,7 @@ const DEFAULT_REGION = {
 
 const narrativeCache: Record<string, string> = {};
 
+
 // Module-level persistent state so active quest survives tab switching
 let globalActiveMissionId: string | null = null;
 
@@ -78,7 +79,6 @@ export default function LiveMapPageScreen() {
 
   const isTracking = globalActiveMissionId !== null;
   const targetId = globalActiveMissionId;
-
   const [missions, setMissions] = useState<Mission[]>([]);
   const [currentLocation, setCurrentLocation] = useState<CurrentLocation | null>(null);
   const [mapRegion, setMapRegion] = useState(DEFAULT_REGION);
@@ -139,6 +139,7 @@ export default function LiveMapPageScreen() {
 
   useEffect(() => {
     const fetchMissions = async () => {
+
       let uLat = DEFAULT_REGION.latitude;
       let uLng = DEFAULT_REGION.longitude;
 
@@ -172,7 +173,21 @@ export default function LiveMapPageScreen() {
             }
           }
         });
-        setMissions(mapped.sort((a, b) => b.priority - a.priority));
+
+        // Inject Demo Mission at user's current location
+        const demoMission: Mission = {
+          id: 'demo-mission-id',
+          title: 'Immediate Anomaly Verification (Demo)',
+          narrative: 'Sensors detect a localized anomaly exactly at your coordinates. Verify immediately to secure the sector.',
+          coordinates: { lat: uLat + 0.0001, lng: uLng + 0.0001 },
+          priority: 5,
+          status: 'active',
+          weather_trigger: null,
+          location_name: 'Current Sector',
+          created_at: new Date().toISOString()
+        };
+
+        setMissions([demoMission, ...mapped].sort((a, b) => b.priority - a.priority));
       }
     };
 
@@ -203,7 +218,7 @@ export default function LiveMapPageScreen() {
 
       setCurrentLocation(nextLocation);
 
-      // Do not re-center the map automatically every pixel, allows user to freely pan
+      // Do not re-center the map automatically every pixel — allows user to freely pan
       // while the internal engine still computes radii logic accurately.
 
       setLocationStatus(
@@ -273,6 +288,7 @@ export default function LiveMapPageScreen() {
     return '#22c55e';
   };
 
+
   const activeMissions = missions.filter((m) => m.status === 'active');
 
   // Find if user is in range of any target mission
@@ -295,6 +311,7 @@ export default function LiveMapPageScreen() {
   // Decide which missions to map over
   const mapMissions = activeTargetMission ? [activeTargetMission] : activeMissions.slice(0, 5);
 
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container}>
@@ -310,6 +327,13 @@ export default function LiveMapPageScreen() {
                 ))}
               </View>
 
+              {isTracking && pathCoordinates.length > 1 && (
+                <Polyline
+                  coordinates={pathCoordinates}
+                  strokeColor="#ef4444"
+                  strokeWidth={4}
+                />
+              )}
               {mapMissions.map((spot) => (
                 <View
                   key={spot.id}
@@ -321,6 +345,7 @@ export default function LiveMapPageScreen() {
                       backgroundColor: priorityColor(spot.priority),
                     },
                   ]}
+
                 />
               ))}
 
@@ -336,6 +361,7 @@ export default function LiveMapPageScreen() {
                 />
               ) : null}
 
+
               <Text style={styles.mapLabel}>
                 {activeTargetMission
                   ? 'Target Mission Coordinates Locked'
@@ -349,6 +375,14 @@ export default function LiveMapPageScreen() {
               showsUserLocation={true}
               showsMyLocationButton={true}
             >
+              {isTracking && pathCoordinates.length > 1 && (
+                <Polyline
+                  coordinates={pathCoordinates}
+                  strokeColor="#ef4444"
+                  strokeWidth={4}
+                />
+              )}
+
               {currentLocation ? (
                 <Marker
                   coordinate={{
@@ -462,6 +496,7 @@ export default function LiveMapPageScreen() {
 
         <View style={styles.feedCard}>
           <Text style={styles.feedTitle}>Live Feed</Text>
+
           {activeTargetMission ? (
             <View>
               <Text style={{ fontSize: 13, fontWeight: '800', color: EcoColors.primary, marginBottom: 8, letterSpacing: 0.5 }}>ACTIVE OPERATION IN PROGRESS:</Text>
@@ -473,6 +508,7 @@ export default function LiveMapPageScreen() {
               </Text>
             </View>
           ) : activeMissions.length === 0 ? (
+
             <Text style={styles.feedItem}>No active missions. All clear.</Text>
           ) : (
             activeMissions.slice(0, 5).map((spot) => (

@@ -5,15 +5,17 @@ import { serve } from 'https://deno.land/std@0.210.0/http/server.ts'
 import { corsHeaders, requireUser, supabaseAdmin } from '../_shared/supabase.ts'
 import { AiVerificationRequest, AiVerificationResponse, ApiError } from '../_shared/contracts.ts'
 
-const AUTO_APPROVAL_THRESHOLD = 0.9
+const AUTO_APPROVAL_THRESHOLD = 0.85
+const AUTO_REJECTION_THRESHOLD = 0.75
 const AUTO_APPROVAL_XP = 75
 
 function normalizeVerdict(
   confidenceScore: number,
   requestedVerdict?: AiVerificationRequest['verdict'],
 ): AiVerificationResponse['verdict'] {
-  if (confidenceScore > AUTO_APPROVAL_THRESHOLD) return 'approved'
-  return requestedVerdict || 'needs_review'
+  if (requestedVerdict === 'approved' && confidenceScore >= AUTO_APPROVAL_THRESHOLD) return 'approved'
+  if (requestedVerdict === 'rejected' && confidenceScore >= AUTO_REJECTION_THRESHOLD) return 'rejected'
+  return 'needs_review'
 }
 
 serve(async (req) => {
@@ -23,10 +25,10 @@ serve(async (req) => {
 
   const url = new URL(req.url)
   const method = req.method
-  const path = url.pathname.replace('/ai-verification-receiver', '')
+  const pathname = url.pathname
 
   try {
-    if (method === 'POST' && path === '/verify') {
+    if (method === 'POST' && pathname.endsWith('/verify')) {
       // Authenticate via AI Service Key
       const aiKey = req.headers.get('X-AI-SERVICE-KEY')
       if (aiKey !== Deno.env.get('AI_SERVICE_KEY')) {
@@ -47,7 +49,7 @@ serve(async (req) => {
       }
 
       const finalVerdict = normalizeVerdict(confidence_score, verdict)
-      const autoApproved = confidence_score > AUTO_APPROVAL_THRESHOLD
+      const autoApproved = finalVerdict === 'approved'
 
       const { data: submission, error: updateError } = await supabaseAdmin
         .from('mission_submissions')
