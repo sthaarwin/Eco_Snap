@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'expo-router';
 import { Image, Pressable, FlatList, StyleSheet, Text, View, ActivityIndicator, Dimensions, Modal, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -78,6 +78,8 @@ export default function MissionBriefScreen() {
   const [showDetails, setShowDetails] = useState(false);
   const [aiNarrative, setAiNarrative] = useState<string | null>(null);
   const [isImprovising, setIsImprovising] = useState(false);
+  const flatListRef = useRef<FlatList>(null);
+  const allMissionsRef = useRef<(Mission & { distance?: number })[]>([]);
 
   useEffect(() => {
     const fetchMissions = async () => {
@@ -179,9 +181,11 @@ export default function MissionBriefScreen() {
               sortedMissions.push(...sortedInCluster);
             }
             setMissions(sortedMissions.slice(0, 5));
+            allMissionsRef.current = sortedMissions;
           } else {
             missionsWithDistance.sort((a, b) => (a.distance || 0) - (b.distance || 0));
             setMissions(missionsWithDistance.slice(0, 5));
+            allMissionsRef.current = missionsWithDistance;
           }
         }
       } catch (err) {
@@ -199,6 +203,24 @@ export default function MissionBriefScreen() {
     if (selectedMission) {
       // Mark quest as started so the scan page knows
       setActiveQuestId(selectedMission.id);
+
+      // Remove started mission from the displayed list
+      const remaining = missions.filter(m => m.id !== selectedMission.id);
+
+      // Try to pull a replacement from the reserve pool
+      const displayedIds = new Set(remaining.map(m => m.id));
+      const replacement = allMissionsRef.current.find(m => !displayedIds.has(m.id) && m.id !== selectedMission.id);
+      const updated = replacement ? [...remaining, replacement] : remaining;
+
+      setMissions(updated);
+      // Reset index to stay in bounds
+      const newIndex = Math.min(currentIndex, updated.length - 1);
+      setCurrentIndex(Math.max(0, newIndex));
+      // Scroll to the new index after state updates
+      setTimeout(() => {
+        flatListRef.current?.scrollToIndex({ index: Math.max(0, newIndex), animated: false });
+      }, 100);
+
       router.push(`/live-map-page?tracking=true&missionId=${selectedMission.id}`);
     }
   };
@@ -269,16 +291,38 @@ export default function MissionBriefScreen() {
         ) : (
           <>
             <FlatList
-              data={missions}
+              ref={flatListRef}
+              data={missions.length > 1 ? [...missions, ...missions, ...missions] : missions}
               horizontal
               pagingEnabled
               showsHorizontalScrollIndicator={false}
-              keyExtractor={(item) => item.id}
+              keyExtractor={(item, index) => `${item.id}_${index}`}
+              initialScrollIndex={missions.length > 1 ? missions.length : 0}
               onMomentumScrollEnd={(e) => {
-                const index = Math.round(e.nativeEvent.contentOffset.x / width);
-                setCurrentIndex(index);
+                const rawIndex = Math.round(e.nativeEvent.contentOffset.x / width);
+                const count = missions.length;
+                if (count <= 1) {
+                  setCurrentIndex(0);
+                  return;
+                }
+                const realIndex = rawIndex % count;
+                setCurrentIndex(realIndex);
+                // If scrolled into first or last copy, silently reset to middle copy
+                if (rawIndex < count || rawIndex >= count * 2) {
+                  const middleIndex = count + realIndex;
+                  setTimeout(() => {
+                    flatListRef.current?.scrollToOffset({ offset: middleIndex * width, animated: false });
+                  }, 50);
+                }
               }}
-              renderItem={({ item: mission, index }) => (
+              getItemLayout={(_, index) => ({
+                length: width,
+                offset: width * index,
+                index,
+              })}
+              renderItem={({ item: mission, index: flatIndex }) => {
+                const realIndex = missions.length > 1 ? flatIndex % missions.length : flatIndex;
+                return (
                 <View style={{ width, paddingHorizontal: EcoSpacing.lg }}>
                   <View style={styles.card}>
                     <View style={styles.badgeRow}>
@@ -286,15 +330,10 @@ export default function MissionBriefScreen() {
                       <Text style={[styles.badge, styles.priorityBadge, mission.priority >= 4 && styles.urgentBadge]}>
                         PRIORITY {mission.priority}
                       </Text>
-                      {userStats && mission.priority > userStats.level && (
-                        <Text style={[styles.badge, styles.priorityBadge, { backgroundColor: '#f1f5f9', color: '#64748b' }]}>
-                          CHALLENGING
-                        </Text>
-                      )}
                     </View>
 
                     <Text style={styles.missionCardTitle}>
-                      {mission.title ? mission.title : `Mission #${index + 1}`}
+                      {mission.title ? mission.title : `Mission #${realIndex + 1}`}
                     </Text>
 
                     <View style={styles.heroCard}>
@@ -330,7 +369,7 @@ export default function MissionBriefScreen() {
                     </View>
                   </View>
                 </View>
-              )}
+              );}}
             />
 
             <View style={styles.pagination}>
