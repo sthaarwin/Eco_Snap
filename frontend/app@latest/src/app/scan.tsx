@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Alert, Image, Modal, Platform, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 
 import { EcoColors, EcoRadius, EcoSpacing } from '@/constants/ecosnap-theme';
 import { SUPABASE_URL, supabase } from '@/lib/supabase';
+import { hasActiveQuest as checkQuestActive, clearActiveQuest } from '@/lib/quest-state';
 
 export default function ScanScreen() {
   const cameraRef = useRef<CameraView | null>(null);
@@ -15,6 +16,7 @@ export default function ScanScreen() {
   const [capturedPhotoBase64, setCapturedPhotoBase64] = useState<string | null>(null);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [hasActiveQuestState, setHasActiveQuestState] = useState<boolean>(false);
 
   useEffect(() => {
     if (!permission) {
@@ -22,7 +24,26 @@ export default function ScanScreen() {
     }
   }, [permission, requestPermission]);
 
+  // Re-check quest state every time the scan tab is focused
+  useFocusEffect(
+    useCallback(() => {
+      setHasActiveQuestState(checkQuestActive());
+    }, [])
+  );
+
   const handleShutterPress = async () => {
+    if (!hasActiveQuestState) {
+      Alert.alert(
+        'No Active Quest',
+        'You need to start a quest from Mission Brief before you can take a photo.',
+        [
+          { text: 'Go to Missions', onPress: () => router.push('/mission-brief') },
+          { text: 'Cancel', style: 'cancel' },
+        ]
+      );
+      return;
+    }
+
     if (isTakingPicture || !cameraRef.current) {
       return;
     }
@@ -112,6 +133,9 @@ export default function ScanScreen() {
       setCapturedPhotoBase64(null);
 
       if (result.verification_status === 'approved') {
+        // Clear the active quest since it's been completed
+        clearActiveQuest();
+        setHasActiveQuestState(false);
         Alert.alert('✅ Approved', `Gemini verified your submission!${result.reward_awarded ? ` +${result.reward_awarded} XP awarded.` : ''}`, [
           { text: 'OK', onPress: () => router.push('/council-page') },
         ]);
@@ -190,14 +214,36 @@ export default function ScanScreen() {
           </View>
         </View>
 
+        {!hasActiveQuestState && hasActiveQuestState !== null && (
+          <View style={styles.noQuestBanner}>
+            <Text style={styles.noQuestText}>Start a quest from Mission Brief to enable scanning</Text>
+            <Pressable
+              style={styles.goToMissionsButton}
+              onPress={() => router.push('/mission-brief')}>
+              <Text style={styles.goToMissionsText}>Go to Missions</Text>
+            </Pressable>
+          </View>
+        )}
+
         <Pressable
           accessibilityRole="button"
           onPress={() => void handleShutterPress()}
-          style={({ pressed }) => [styles.shutterButton, pressed && styles.shutterPressed]}>
-          <View style={styles.shutterInner} />
+          disabled={!hasActiveQuestState}
+          style={({ pressed }) => [
+            styles.shutterButton,
+            pressed && hasActiveQuestState && styles.shutterPressed,
+            !hasActiveQuestState && styles.shutterDisabled,
+          ]}>
+          <View style={[styles.shutterInner, !hasActiveQuestState && styles.shutterInnerDisabled]} />
         </Pressable>
 
-        <Text style={styles.shutterHint}>{isTakingPicture ? 'Capturing...' : 'Tap to click a photo'}</Text>
+        <Text style={styles.shutterHint}>
+          {!hasActiveQuestState
+            ? 'Start a quest to unlock scanning'
+            : isTakingPicture
+              ? 'Capturing...'
+              : 'Tap to click a photo'}
+        </Text>
       </View>
 
       <Modal visible={showPreviewModal} transparent animationType="fade" onRequestClose={handleRetake}>
@@ -386,6 +432,40 @@ const styles = StyleSheet.create({
     color: EcoColors.textMuted,
     fontSize: 12,
     fontWeight: '600',
+  },
+  shutterDisabled: {
+    opacity: 0.4,
+    borderColor: '#d1d5db',
+  },
+  shutterInnerDisabled: {
+    borderColor: '#d1d5db',
+    backgroundColor: '#f3f4f6',
+  },
+  noQuestBanner: {
+    backgroundColor: '#fff7ed',
+    borderWidth: 1,
+    borderColor: '#fed7aa',
+    borderRadius: EcoRadius.lg,
+    padding: EcoSpacing.md,
+    alignItems: 'center',
+    gap: EcoSpacing.sm,
+  },
+  noQuestText: {
+    color: '#9a3412',
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  goToMissionsButton: {
+    backgroundColor: EcoColors.primary,
+    borderRadius: EcoRadius.md,
+    paddingVertical: 8,
+    paddingHorizontal: EcoSpacing.md,
+  },
+  goToMissionsText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 13,
   },
   modalBackdrop: {
     flex: 1,

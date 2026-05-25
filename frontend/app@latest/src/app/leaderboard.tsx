@@ -1,8 +1,10 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Pressable,
   RefreshControl,
   SafeAreaView,
   ScrollView,
@@ -41,6 +43,7 @@ function roleLabel(role: string | null) {
 
 export default function LeaderboardScreen() {
   const { user } = useAuth();
+  const router = useRouter();
   const [profiles, setProfiles] = useState<LeaderboardProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -50,7 +53,7 @@ export default function LeaderboardScreen() {
       .from('profiles')
       .select('id, username, xp, level, role')
       .order('xp', { ascending: false })
-      .limit(50);
+      .limit(10);
 
     if (error) throw error;
     setProfiles(data ?? []);
@@ -83,6 +86,21 @@ export default function LeaderboardScreen() {
     return index >= 0 ? index + 1 : null;
   }, [profiles, user?.id]);
 
+  const currentUserProfile = useMemo(() => {
+    return profiles.find((profile) => profile.id === user?.id) ?? null;
+  }, [profiles, user?.id]);
+
+  const highestLevelPlayer = useMemo(() => {
+    if (profiles.length === 0) return null;
+    return profiles.reduce((best, p) => {
+      const bLevel = best.level ?? 0;
+      const pLevel = p.level ?? 0;
+      if (pLevel > bLevel) return p;
+      if (pLevel === bLevel && (p.xp ?? 0) > (best.xp ?? 0)) return p;
+      return best;
+    }, profiles[0]);
+  }, [profiles]);
+
   if (isLoading) {
     return (
       <SafeAreaView style={styles.safeArea}>
@@ -101,6 +119,14 @@ export default function LeaderboardScreen() {
         refreshControl={
           <RefreshControl refreshing={isRefreshing} onRefresh={() => void refreshLeaderboard()} />
         }>
+        <Pressable
+          onPress={() => router.back()}
+          accessibilityLabel="Go back"
+          style={({ pressed }) => [styles.backButton, pressed && { opacity: 0.6 }]}>
+          <MaterialCommunityIcons name="chevron-left" size={28} color={EcoColors.text} />
+          <Text style={styles.backText}>Back</Text>
+        </Pressable>
+
         <View style={styles.headerRow}>
           <View>
             <Text style={styles.header}>Leaderboard</Text>
@@ -117,8 +143,13 @@ export default function LeaderboardScreen() {
             <Text style={styles.summaryValue}>{currentUserRank ? `#${currentUserRank}` : '--'}</Text>
           </View>
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryLabel}>Players</Text>
-            <Text style={styles.summaryValue}>{profiles.length}</Text>
+            <Text style={styles.summaryLabel}>Highest Level</Text>
+            <Text style={styles.summaryValue}>Lv {highestLevelPlayer?.level ?? 0}</Text>
+            {highestLevelPlayer && (
+              <Text style={styles.summarySubtext}>
+                {highestLevelPlayer.username || 'EcoSnap Scout'} · {highestLevelPlayer.xp ?? 0} XP
+              </Text>
+            )}
           </View>
         </View>
 
@@ -163,6 +194,30 @@ export default function LeaderboardScreen() {
             );
           })
         )}
+
+        {/* Current user stats */}
+        <View style={styles.userStatsCard}>
+          <View style={styles.userStatsHeader}>
+            <MaterialCommunityIcons name="account-circle" size={24} color={EcoColors.primary} />
+            <Text style={styles.userStatsTitle}>Your Stats</Text>
+          </View>
+          <View style={styles.userStatsRow}>
+            <View style={styles.userStatItem}>
+              <Text style={styles.userStatValue}>{currentUserProfile?.xp ?? 0}</Text>
+              <Text style={styles.userStatLabel}>XP Earned</Text>
+            </View>
+            <View style={styles.userStatDivider} />
+            <View style={styles.userStatItem}>
+              <Text style={styles.userStatValue}>{currentUserProfile?.level ?? 1}</Text>
+              <Text style={styles.userStatLabel}>Level</Text>
+            </View>
+            <View style={styles.userStatDivider} />
+            <View style={styles.userStatItem}>
+              <Text style={styles.userStatValue}>{currentUserRank ? `#${currentUserRank}` : '--'}</Text>
+              <Text style={styles.userStatLabel}>Rank</Text>
+            </View>
+          </View>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -188,11 +243,26 @@ const styles = StyleSheet.create({
     color: EcoColors.textMuted,
     fontWeight: '700',
   },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 2,
+    marginTop: EcoSpacing.md,
+    paddingVertical: 4,
+    paddingRight: EcoSpacing.sm,
+  },
+  backText: {
+    color: EcoColors.text,
+    fontSize: 16,
+    fontWeight: '600',
+  },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: EcoSpacing.md,
+    marginTop: EcoSpacing.xs,
   },
   header: {
     color: EcoColors.text,
@@ -235,6 +305,12 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '900',
     marginTop: 4,
+  },
+  summarySubtext: {
+    color: EcoColors.textMuted,
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2,
   },
   emptyCard: {
     backgroundColor: EcoColors.surface,
@@ -312,5 +388,50 @@ const styles = StyleSheet.create({
     color: EcoColors.textMuted,
     fontSize: 11,
     fontWeight: '800',
+  },
+  userStatsCard: {
+    backgroundColor: EcoColors.surface,
+    borderRadius: EcoRadius.lg,
+    borderWidth: 1,
+    borderColor: EcoColors.primary,
+    padding: EcoSpacing.md,
+    marginTop: EcoSpacing.sm,
+  },
+  userStatsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: EcoSpacing.xs,
+    marginBottom: EcoSpacing.md,
+  },
+  userStatsTitle: {
+    color: EcoColors.text,
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  userStatsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+  },
+  userStatItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  userStatValue: {
+    color: EcoColors.primary,
+    fontSize: 24,
+    fontWeight: '900',
+  },
+  userStatLabel: {
+    color: EcoColors.textMuted,
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    marginTop: 2,
+  },
+  userStatDivider: {
+    width: 1,
+    height: 36,
+    backgroundColor: EcoColors.border,
   },
 });
