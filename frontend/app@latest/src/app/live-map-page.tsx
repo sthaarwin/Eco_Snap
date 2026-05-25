@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as Location from 'expo-location';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Animated, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
@@ -62,6 +63,70 @@ const narrativeCache: Record<string, string> = {};
 
 // Module-level persistent state so active quest survives tab switching
 let globalActiveMissionId: string | null = null;
+
+function SlideToCancelMission({ onCancel }: { onCancel: () => void }) {
+  const [trackWidth, setTrackWidth] = useState(0);
+  const translateX = useRef(new Animated.Value(0)).current;
+  const latestX = useRef(0);
+  const maxTranslateRef = useRef(0);
+  const thumbSize = 48;
+  const maxTranslate = Math.max(0, trackWidth - thumbSize - 8);
+  maxTranslateRef.current = maxTranslate;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) => Math.abs(gestureState.dx) > 6,
+      onPanResponderMove: (_, gestureState) => {
+        const maxDrag = maxTranslateRef.current;
+        const nextX = Math.min(Math.max(gestureState.dx, 0), maxDrag);
+        latestX.current = nextX;
+        translateX.setValue(nextX);
+      },
+      onPanResponderRelease: () => {
+        const maxDrag = maxTranslateRef.current;
+        if (maxDrag > 0 && latestX.current >= maxDrag * 0.74) {
+          Animated.timing(translateX, {
+            toValue: maxDrag,
+            duration: 120,
+            useNativeDriver: true,
+          }).start(onCancel);
+          return;
+        }
+
+        latestX.current = 0;
+        Animated.spring(translateX, {
+          toValue: 0,
+          useNativeDriver: true,
+          bounciness: 6,
+        }).start();
+      },
+      onPanResponderTerminate: () => {
+        latestX.current = 0;
+        Animated.spring(translateX, {
+          toValue: 0,
+          useNativeDriver: true,
+          bounciness: 6,
+        }).start();
+      },
+    }),
+  ).current;
+
+  return (
+    <View
+      style={styles.cancelSlider}
+      onLayout={(event) => setTrackWidth(event.nativeEvent.layout.width)}>
+      <Text style={styles.cancelSliderText}>Slide to cancel mission</Text>
+      <Animated.View
+        {...panResponder.panHandlers}
+        style={[
+          styles.cancelSliderThumb,
+          { transform: [{ translateX }] },
+        ]}>
+        <MaterialCommunityIcons name="chevron-right" size={26} color="#fff" />
+      </Animated.View>
+    </View>
+  );
+}
 
 export default function LiveMapPageScreen() {
   const router = useRouter();
@@ -315,8 +380,19 @@ export default function LiveMapPageScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.title}>Live Impact Map</Text>
-        <Text style={styles.subtitle}>{locationStatus}</Text>
+        <View style={styles.headerRow}>
+          <View style={styles.headerText}>
+            <Text style={styles.title}>Live Impact Map</Text>
+            <Text style={styles.subtitle}>{locationStatus}</Text>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Open leaderboard"
+            onPress={() => router.push('/leaderboard')}
+            style={({ pressed }) => [styles.leaderboardButton, pressed && styles.pressed]}>
+            <MaterialCommunityIcons name="trophy-outline" size={22} color="#fff" />
+          </Pressable>
+        </View>
 
         <View style={styles.mapCard}>
           {Platform.OS === 'web' ? (
@@ -506,6 +582,15 @@ export default function LiveMapPageScreen() {
               <Text style={{ fontSize: 14, color: canClearQuest ? EcoColors.primary : EcoColors.textMuted, marginTop: 4, fontWeight: '700' }}>
                 {canClearQuest ? "✅ Coordinates reached. You may clear this quest." : "❌ Out of range. Move closer to the target zone."}
               </Text>
+              <SlideToCancelMission
+                onCancel={() => {
+                  globalActiveMissionId = null;
+                  setPathCoordinates([]);
+                  setSelectedMission(null);
+                  setAiNarrative(null);
+                  router.replace('/live-map-page?clearTracking=true');
+                }}
+              />
             </View>
           ) : activeMissions.length === 0 ? (
 
@@ -553,15 +638,42 @@ const styles = StyleSheet.create({
     gap: EcoSpacing.md,
     paddingBottom: EcoSpacing.xl,
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: EcoSpacing.md,
+    marginTop: EcoSpacing.sm,
+  },
+  headerText: {
+    flex: 1,
+    minWidth: 0,
+  },
   title: {
     color: EcoColors.text,
-    fontSize: 30,
+    fontSize: 25,
     fontWeight: '800',
-    marginTop: EcoSpacing.sm,
   },
   subtitle: {
     color: EcoColors.textMuted,
     lineHeight: 22,
+    marginTop: 3,
+  },
+  leaderboardButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: EcoColors.primary,
+    shadowColor: EcoColors.primary,
+    shadowOpacity: 0.22,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 5,
+  },
+  pressed: {
+    opacity: 0.75,
   },
   mapCard: {
     height: 280,
@@ -678,6 +790,38 @@ const styles = StyleSheet.create({
     color: EcoColors.textMuted,
     lineHeight: 21,
     textTransform: 'capitalize',
+  },
+  cancelSlider: {
+    height: 56,
+    borderRadius: EcoRadius.pill,
+    backgroundColor: '#fee2e2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    justifyContent: 'center',
+    marginTop: EcoSpacing.md,
+    overflow: 'hidden',
+  },
+  cancelSliderText: {
+    color: EcoColors.danger,
+    fontSize: 14,
+    fontWeight: '800',
+    textAlign: 'center',
+    textTransform: 'uppercase',
+  },
+  cancelSliderThumb: {
+    position: 'absolute',
+    left: 4,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: EcoColors.danger,
+    shadowColor: EcoColors.danger,
+    shadowOpacity: 0.24,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 5,
   },
   primaryButton: {
     backgroundColor: EcoColors.primary,

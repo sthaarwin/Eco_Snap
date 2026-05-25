@@ -1,0 +1,3 @@
+Error: Premature close
+    at onclose (node:internal/streams/end-of-stream:159:30)
+    at processTicksAndRejections (node:internal/process/task_queues:77:11)
